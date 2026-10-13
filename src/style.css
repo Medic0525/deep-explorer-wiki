@@ -404,3 +404,6 @@ td.num, th.num { text-align: right; }
 .spec-choice { width: 100%; padding: 5px 9px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--fg); font-size: 14px; }
 #p-spec-sel { padding: 5px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); max-width: 100%; }
 .btn.via[aria-pressed="true"] { background: var(--accent-soft); }
+.chip.sys { color: var(--accent); text-decoration: none; font-weight: 500; }
+.chip.sys.mention { color: var(--muted); border-style: dashed; font-weight: 400; }
+.chip.sys:hover { background: var(--accent-soft); }
