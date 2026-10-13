@@ -98,6 +98,40 @@
   var TAG_COUNT = {};
   ALL.forEach(function (a) { a.tags.forEach(function (x) { TAG_COUNT[x] = (TAG_COUNT[x] || 0) + 1; }); });
   function mentions(a, tag) { return a.tags.indexOf(tag) >= 0 || a.hay.indexOf(tag.toLowerCase()) >= 0; }
+
+  // 體系標籤：以某個核心能力為根，凡是先決條件(任意層)連到它的能力都算該體系；
+  // 「提及」則是說明文字用到該體系資源、但沒有列為先決條件的能力。要新增體系就在這裡加一列。
+  var SYSTEMS = [
+    { n: '吟遊激勵', root: '吟遊激勵', re: /吟[遊游]激勵/ },
+    { n: '荒野形態', root: '荒野形態', re: /荒野[形型]態/ },
+    { n: '氣', root: '氣', re: /\[氣\]|[點耗]\s*\d*\s*點?\s*氣(?![息味勢場候泡])|(?:花費|消耗)[^，。\d]{0,8}氣(?![息味泡元])|氣豁免|氣的(?:豁免|數量|\s*DC)|【特殊】\s*氣\]/ },
+    { n: '神力引導', root: '神力引導', re: /神力引導/ }
+  ];
+  var SYS_COUNT = {}, SYS_WIDE_COUNT = {};
+  SYSTEMS.forEach(function (sy) {
+    var root = BY_NAME[norm(sy.root)], set = {};
+    if (root) {
+      set[root.id] = 1;
+      var queue = [root.id];
+      while (queue.length) {
+        (UNLOCKS[queue.shift()] || []).forEach(function (u) { if (!set[u]) { set[u] = 1; queue.push(u); } });
+      }
+    }
+    SYS_COUNT[sy.n] = 0; SYS_WIDE_COUNT[sy.n] = 0;
+    ALL.forEach(function (a) {
+      if (set[a.id]) { (a.sys = a.sys || []).push(sy.n); SYS_COUNT[sy.n]++; SYS_WIDE_COUNT[sy.n]++; }
+      else if (sy.re.test(a.n + ' ' + a.t.join(' ') + ' ' + (a.req || ''))) { (a.sysMention = a.sysMention || []).push(sy.n); SYS_WIDE_COUNT[sy.n]++; }
+    });
+  });
+  function tagMatch(a, tag, wide) {
+    if (tag.indexOf('sys:') === 0) {
+      var n = tag.slice(4);
+      return (a.sys || []).indexOf(n) >= 0 || (wide && (a.sysMention || []).indexOf(n) >= 0);
+    }
+    return wide ? mentions(a, tag) : a.tags.indexOf(tag) >= 0;
+  }
+  function tagLabel(tag) { return tag.indexOf('sys:') === 0 ? tag.slice(4) + ' 體系' : '#' + tag; }
+  function tagKnown(tag) { return tag.indexOf('sys:') === 0 ? SYS_COUNT[tag.slice(4)] != null : !!TAG_COUNT[tag]; }
   ALL.forEach(function (a) { a.order = ALL.indexOf(a); });
 
   var STATS = {
@@ -349,7 +383,7 @@
   // ------------------------------------------------------------------ 能力目錄
   var F_DEFAULT = { q: '', b: 'all', src: 'all', cost: 'all', entry: false, rep: false, sort: 'book', tag: '', tagWide: false };
   var F = Object.assign({}, F_DEFAULT, store('dex-filters') || {});
-  if (F.tag && !TAG_COUNT[F.tag]) F.tag = '';
+  if (F.tag && !tagKnown(F.tag)) F.tag = '';
   var listLimit = 150, catalogBuilt = false, selectedId = null;
 
   function costBucket(c) {
@@ -366,7 +400,7 @@
       if (F.cost !== 'all' && costBucket(a.c) !== F.cost) return false;
       if (F.entry && a.req) return false;
       if (F.rep && !a.rep) return false;
-      if (F.tag && !(F.tagWide ? mentions(a, F.tag) : a.tags.indexOf(F.tag) >= 0)) return false;
+      if (F.tag && !tagMatch(a, F.tag, F.tagWide)) return false;
       for (var i = 0; i < terms.length; i++) if (a.hay.indexOf(terms[i]) < 0) return false;
       return true;
     });
@@ -405,7 +439,10 @@
     return o;
   }
   function tagOptions() {
-    var seen = {}, html = '<option value="">全部</option>';
+    var seen = {}, html = '<option value="">全部</option>' +
+      '<optgroup label="體系（依先決條件串連）">' + SYSTEMS.map(function (sy) {
+        return '<option value="sys:' + sy.n + '">' + sy.n + ' 體系（' + SYS_COUNT[sy.n] + '）</option>';
+      }).join('') + '</optgroup>';
     function opt(x) { seen[x] = 1; return '<option value="' + x + '">#' + x + '（' + TAG_COUNT[x] + '）</option>'; }
     TAG_GROUPS.forEach(function (g) {
       var list = g[1].filter(function (x) { return TAG_COUNT[x]; });
@@ -471,7 +508,7 @@
   function renderList() {
     $$('#f-b button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-v') === F.b)); });
     var res = filtered();
-    $('#f-count').textContent = '符合 ' + res.length + ' 個' + (F.tag ? '（#' + F.tag + (F.tagWide ? '，含說明中提到' : '') + '）' : '');
+    $('#f-count').textContent = '符合 ' + res.length + ' 個' + (F.tag ? '（' + tagLabel(F.tag) + (F.tagWide ? '，含說明中提到' : '') + '）' : '');
     var html = res.slice(0, listLimit).map(rowHTML).join('');
     if (!res.length) html = '<li class="empty">沒有符合的能力。試著清除搜尋字或放寬篩選。</li>';
     if (res.length > listLimit) html += '<li><button type="button" class="more-btn">再顯示 ' + Math.min(300, res.length - listLimit) + ' 個（共 ' + res.length + ' 個）</button></li>';
@@ -487,6 +524,12 @@
     if (a.src === 'faction') chips += factionChip(a.f, true);
     if (a.rep) chips += '<span class="chip flag">可重複購買</span>';
     if (a.stub) chips += '<span class="chip stub">待補</span>';
+    (a.sys || []).forEach(function (n) {
+      chips += '<a class="chip sys" href="#abilities" data-tag="sys:' + n + '" title="列出 ' + n + ' 體系的所有能力">' + n + ' 體系</a>';
+    });
+    (a.sysMention || []).forEach(function (n) {
+      chips += '<a class="chip sys mention" href="#abilities" data-tag="sys:' + n + '" data-wide="1" title="說明中用到' + n + '，但不是先決條件">提及 ' + n + '</a>';
+    });
     var p = pickOf(a.id);
     var addBtn = (p && !a.rep)
       ? '<a class="btn ghost small" href="#planner">已在購點規劃中</a>'
@@ -929,7 +972,7 @@
     var t = e.target.closest('[data-tag]');
     if (!t) return;
     e.preventDefault();
-    F = Object.assign({}, F_DEFAULT, { tag: t.getAttribute('data-tag'), sort: F.sort });
+    F = Object.assign({}, F_DEFAULT, { tag: t.getAttribute('data-tag'), tagWide: t.hasAttribute('data-wide'), sort: F.sort });
     store('dex-filters', F);
     listLimit = 150;
     if (catalogBuilt) syncControls();
