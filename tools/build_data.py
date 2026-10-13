@@ -24,6 +24,12 @@ SECTION_TITLES = [b + '類能力' for b in BRANCHES]
 REF_ALIASES = {
     '靈動步伐': '靈動步法',
     '堅岩之鎧': '堅岩鎧',
+    '光明火炬': '神力引導﹝光明火炬﹞',
+    '光明之劍': '神力引導﹝光明之劍﹞',
+    '圖騰精魂': '精魂圖騰',
+    '聖甲蟲使徒': '聖甲蟲聖徒',
+    '動物夥伴原初野獸': '動物夥伴-原初野獸',
+    '動物夥伴龍獸看守': '動物夥伴-龍獸看守',
 }
 
 
@@ -46,6 +52,7 @@ def tidy(s):
 
 def norm(name):
     s = re.sub(r'\s+', '', name)
+    s = re.sub(r'(?<=[^A-Za-z])III$', 'Ⅲ', re.sub(r'(?<=[^A-Za-z])II$', 'Ⅱ', s))
     return s.replace('〔', '﹝').replace('〕', '﹞')
 
 
@@ -56,7 +63,7 @@ raw = re.sub(r'\[#\d+\]\(#\d+\)', '', raw)  # 匯出時殘留的頁碼連結
 start = raw.index('\n通用類能力\n')
 body_src = raw[start:]
 
-HDR = re.compile(r'(?<![\[［])【\s*(通用|武力|靈敏|魔法|特殊|敏捷)\s*】\s*([^\n【]{1,40}?)\s*[(（]\s*(\d+)\s*(?:DP)?\s*[)）]')
+HDR = re.compile(r'(?<![\[［])【\s*(通用|武力|靈敏|魔法|特殊|敏捷)\s*】\s*([^\n【]{1,40}?)\s*[(（]\s*(\d+)\s*(?:DP|P)?\s*[)）]')
 
 
 def take_groups(s, i):
@@ -121,10 +128,10 @@ def clean_body(text):
     return res
 
 
-REF = re.compile(r'【\s*(通用|武力|靈敏|魔法|特殊|敏捷)\s*】\s*\]?\s*([^\]］【、]+)')
+REF = re.compile(r'(?:【|\[)\s*(通用|武力|靈敏|魔法|特殊|敏捷)\s*】\s*\]?\s*([^\]］【、]+)')
 
 
-def parse_prereq(text, own_name):
+def find_refs(text, own_name):
     refs = []
     for b, n in REF.findall(text):
         n = norm(n)
@@ -134,17 +141,45 @@ def parse_prereq(text, own_name):
         b = '靈敏' if b == '敏捷' else b
         if not any(r['n'] == n for r in refs):
             refs.append({'b': b, 'n': n})
-    if re.search(r'其中的?[二兩]個|中的兩項|其中[二兩]', text):
-        need = 2
-    elif '三個' in text:
-        need = len(refs)
-    elif '或' in text:
-        need = 1
+    return refs
+
+
+def need_of(text, refs):
+    m = re.search(r'其中的?\s*(\d)\s*個|中的\s*(\d)\s*個', text)
+    if m:
+        return int(m.group(1) or m.group(2))
+    if re.search(r'其中的?[二兩]個|中的[二兩]項|中的兩個|其中[二兩]', text):
+        return 2
+    if re.search(r'中的一個|其中一個|其中一', text) or '或' in text:
+        return 1
+    return len(refs)
+
+
+def parse_prereq(text, own_name):
+    """回傳 (先決條件群組, 排除清單, 是否可由非能力條件滿足, 是否另有非能力條件)。
+
+    群組全部滿足才算符合；每個群組是 {'r': [引用], 'k': 需要幾個}。
+    """
+    excl = []
+    if '不具有' in text:
+        text, rest = text.split('不具有', 1)
+        excl = find_refs(rest, own_name)
+    groups = []
+    # 「A、B、C 中的一個及 D」：拆成兩組
+    m = re.search(r'(中的一個|其中一個)\s*(及|和|且|與)', text)
+    if m:
+        first, second = text[:m.end(1)], text[m.end():]
+        for part in (first, second):
+            r = find_refs(part, own_name)
+            if r:
+                groups.append({'r': r, 'k': need_of(part, r)})
     else:
-        need = len(refs)
-    # 「或角色具有中甲熟練」這類非能力條件，可以不靠能力滿足
+        r = find_refs(text, own_name)
+        if r:
+            groups.append({'r': r, 'k': need_of(text, r)})
     soft = bool(re.search(r'或角色具有', text))
-    return refs, need, soft
+    extra = bool(re.search(r'熟練|已知|數目', re.sub(r'或角色具有.*', '', text))) or (not groups and not soft)
+    return groups, excl, soft, extra
 
 
 hits = []
@@ -164,13 +199,16 @@ for idx, (m, groups, end) in enumerate(hits):
             a['rep'] = 1
         elif '先決條件' in g:
             text = re.sub(r'^需?先決條件\s*-?\s*', '', g).strip()
-            refs, need, soft = parse_prereq(text, name)
+            groups, excl, soft, extra = parse_prereq(text, name)
             a['req'] = text
-            if refs:
-                a['refs'] = refs
-                a['need'] = need
+            if groups:
+                a['groups'] = groups
+            if excl:
+                a['excl'] = excl
             if soft:
                 a['soft'] = 1
+            if extra:
+                a['extra'] = 1
     a['t'] = clean_body(body_src[end:nxt])
     abilities.append(a)
 
@@ -212,6 +250,7 @@ OUT.write_text('/* 由 tools/build_data.py 自動產生，請勿手動編輯 */\
 
 counts = {b: sum(1 for a in abilities if a['b'] == b) for b in BRANCHES}
 known = {a['n'] for a in abilities}
-missing = sorted({r['n'] for a in abilities for r in a.get('refs', []) if r['n'] not in known})
+missing = sorted({r['n'] for a in abilities for g in a.get('groups', []) + [{'r': a.get('excl', [])}]
+                  for r in g['r'] if r['n'] not in known})
 print(f'能力 {len(abilities)} 個 {counts}；精通能力 {len(specialists)} 個')
 print(f'引用但未收錄的能力 {len(missing)} 個: {"、".join(missing)}')

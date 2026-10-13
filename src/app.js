@@ -46,13 +46,18 @@
     f.abilities.forEach(function (a, i) {
       a.id = f.id + String(i + 1).padStart(2, '0');
       a.src = 'faction'; a.f = f.id;
-      if (a.refs) a.need = a.refs.length;
+      if (a.refs) a.groups = [{ r: a.refs, k: a.refs.length }];
       add(a);
     });
   });
   var stubCount = 0;
+  function refsOf(a) {
+    var out = (a.excl || []).slice();
+    (a.groups || []).forEach(function (g) { out = out.concat(g.r); });
+    return out;
+  }
   ALL.slice().forEach(function (a) {
-    (a.refs || []).forEach(function (r) {
+    refsOf(a).forEach(function (r) {
       if (!BY_NAME[norm(r.n)]) {
         stubCount++;
         add({ id: 'x' + String(stubCount).padStart(2, '0'), b: r.b, n: r.n, c: null, stub: true, t: [], src: 'stub' });
@@ -60,8 +65,12 @@
     });
   });
   var UNLOCKS = {};
+  function idOf(r) { return BY_NAME[norm(r.n)].id; }
   ALL.forEach(function (a) {
-    a.refIds = (a.refs || []).map(function (r) { return BY_NAME[norm(r.n)].id; });
+    a.groups = (a.groups || []).map(function (g) { return { ids: g.r.map(idOf), k: g.k }; });
+    a.exclIds = (a.excl || []).map(idOf);
+    a.refIds = [];
+    a.groups.forEach(function (g) { g.ids.forEach(function (id) { if (a.refIds.indexOf(id) < 0) a.refIds.push(id); }); });
     a.refIds.forEach(function (id) { (UNLOCKS[id] = UNLOCKS[id] || []).push(a.id); });
     a.hay = (a.n + ' ' + (a.req || '') + ' ' + a.t.join(' ')).toLowerCase();
   });
@@ -140,19 +149,22 @@
       ? '<a class="chip faction" data-f="' + fid + '" href="#f-' + fid + '" style="text-decoration:none">' + inner + '</a>'
       : '<span class="chip faction" data-f="' + fid + '">' + inner + '</span>';
   }
-  function needLabel(a) {
-    if (!a.refIds.length) return '';
-    if (a.need >= a.refIds.length) return a.refIds.length > 1 ? '需全部具備' : '';
-    if (a.need === 1) return '任一即可';
-    return '需其中 ' + a.need + ' 項';
+  function groupLabel(g) {
+    if (g.ids.length < 2 || g.k >= g.ids.length) return g.ids.length > 1 ? '全部具備' : '';
+    if (g.k === 1) return '任一即可';
+    return '其中 ' + g.k + ' 項';
+  }
+  function groupText(g) {
+    var names = g.ids.map(function (id) { return BY_ID[id].n; });
+    if (g.k === 1 && names.length > 1) return names.join(' 或 ');
+    return names.join('、') + (g.k < names.length ? '（其中 ' + g.k + ' 項）' : '');
   }
   function reqSummary(a) {
-    var names = a.refIds.map(function (id) { return BY_ID[id].n; });
-    if (a.trait) names.push('特性：' + a.req.replace(/^具有特性/, ''));
-    if (!names.length && a.req) names.push(a.req);
-    if (!names.length) return '';
-    var sep = a.need === 1 && a.refIds.length > 1 ? ' 或 ' : '、';
-    return '需：' + names.join(sep);
+    var parts = a.groups.map(groupText);
+    if (a.trait) parts.push('特性：' + a.req.replace(/^具有特性/, ''));
+    if (!parts.length && a.req) parts.push(a.req);
+    if (!parts.length) return '';
+    return '需：' + parts.join('；') + (a.exclIds.length ? '；不可兼得：' + a.exclIds.map(function (id) { return BY_ID[id].n; }).join('、') : '');
   }
 
   // ------------------------------------------------------------------ 規劃狀態
@@ -192,19 +204,19 @@
   }
   function pickMessages(a) {
     var msgs = [];
-    if (a.stub) msgs.push(['warn', '特殊類能力尚未收錄，費用未計入。']);
+    if (a.stub) msgs.push(['warn', '規則書中找不到此能力，費用未計入。']);
     if (a.src === 'faction' && plan.faction !== a.f) msgs.push(['bad', '需加入「' + FBY[a.f].name + '」才能購買。']);
     if (a.trait && plan.faction !== a.f) msgs.push(['bad', '需具有' + a.req.replace(/^具有/, '') + '。']);
-    if (a.refIds.length) {
-      var have = a.refIds.filter(function (id) { return pickOf(id); });
-      if (have.length < a.need) {
-        var lack = a.refIds.filter(function (id) { return !pickOf(id); }).map(function (id) { return BY_ID[id].n; });
-        var txt = '缺少先決條件：' + lack.join(a.need === 1 ? ' 或 ' : '、') + (a.need < a.refIds.length && a.need > 1 ? '（需其中 ' + a.need + ' 項）' : '');
-        msgs.push([a.soft ? 'warn' : 'bad', a.soft ? txt + '，或角色本身已具有相應熟練。' : txt]);
-      }
-    } else if (a.req && !a.trait) {
-      msgs.push(['warn', '條件：' + a.req]);
-    }
+    a.groups.forEach(function (g) {
+      var have = g.ids.filter(function (id) { return pickOf(id); });
+      if (have.length >= g.k) return;
+      var lack = g.ids.filter(function (id) { return !pickOf(id); }).map(function (id) { return BY_ID[id].n; });
+      var txt = '缺少先決條件：' + lack.join(g.k === 1 ? ' 或 ' : '、') + (g.k > 1 && g.k < g.ids.length ? '（需其中 ' + g.k + ' 項）' : '');
+      msgs.push([a.soft ? 'warn' : 'bad', a.soft ? txt + '，或角色本身已具有相應熟練。' : txt]);
+    });
+    var clash = a.exclIds.filter(function (id) { return pickOf(id); });
+    if (clash.length) msgs.push(['bad', '不可與 ' + clash.map(function (id) { return BY_ID[id].n; }).join('、') + ' 同時具有。']);
+    if (a.extra && !a.trait) msgs.push(['warn', '另需符合：' + a.req]);
     return msgs;
   }
 
@@ -260,7 +272,7 @@
       if (F.b !== 'all' && a.b !== F.b) return false;
       if (F.src !== 'all' && a.src !== F.src) return false;
       if (F.cost !== 'all' && costBucket(a.c) !== F.cost) return false;
-      if (F.entry && (a.req || a.refIds.length)) return false;
+      if (F.entry && a.req) return false;
       if (F.rep && !a.rep) return false;
       for (var i = 0; i < terms.length; i++) if (a.hay.indexOf(terms[i]) < 0) return false;
       return true;
@@ -368,19 +380,23 @@
     var h = '<a class="back-link btn ghost small" href="#abilities">← 回到列表</a>' +
       '<div class="head"><div class="chips">' + chips + '</div><h2>' + esc(a.n) + '</h2>' +
       '<div class="price"><span class="dp">' + (a.c == null ? '價格待補' : fmtDP(a.c) + ' DP') + '</span>' + addBtn + '</div></div>';
-    if (a.refIds.length || a.req) {
-      h += '<div class="req-box"><h4>先決條件 ' + (needLabel(a) ? '· ' + needLabel(a) : '') + '</h4>';
-      if (a.refIds.length) {
-        h += '<div class="refs">' + a.refIds.map(function (id) {
-          var r = BY_ID[id], ok = pickOf(id);
-          return '<a class="chip branch' + (r.stub ? ' stub' : '') + '" data-b="' + r.b + '" href="#a-' + id + '" style="text-decoration:none">' +
-            (ok ? '✓ ' : '') + '【' + r.b + '】' + esc(r.n) + '</a>';
-        }).join('') + '</div>';
-      }
-      h += '<p class="req-raw">原文：' + fmt(a.req || '') + '</p></div>';
+    function refChip(id) {
+      var r = BY_ID[id], ok = pickOf(id);
+      return '<a class="chip branch' + (r.stub ? ' stub' : '') + '" data-b="' + r.b + '" href="#a-' + id + '" style="text-decoration:none">' +
+        (ok ? '✓ ' : '') + '【' + r.b + '】' + esc(r.n) + '</a>';
+    }
+    if (a.req) {
+      h += '<div class="req-box"><h4>先決條件</h4>';
+      a.groups.forEach(function (g, i) {
+        var lab = groupLabel(g);
+        h += '<div class="refs">' + (a.groups.length > 1 ? '<span class="req-raw">' + (i ? '並且' : '') + '</span>' : '') +
+          g.ids.map(refChip).join('') + (lab ? '<span class="req-raw">' + lab + '</span>' : '') + '</div>';
+      });
+      if (a.exclIds.length) h += '<div class="refs"><span class="req-raw">不可同時具有</span>' + a.exclIds.map(refChip).join('') + '</div>';
+      h += '<p class="req-raw">原文：' + fmt(a.req) + '</p></div>';
     }
     if (a.stub) {
-      h += '<div class="notice"><strong>內容待補</strong><p>這是主規則書「特殊類能力」章節中的能力，該章節尚未匯入，所以沒有效果說明與價格。下方列出需要它的能力。</p></div>';
+      h += '<div class="notice"><strong>內容待補</strong><p>這個能力被其他能力列為先決條件，但在規則書中找不到它的原文，所以沒有效果說明與價格。下方列出需要它的能力。</p></div>';
     } else {
       h += '<div><h4>效果</h4>' + renderBody(a.t) + '</div>';
     }
@@ -611,7 +627,7 @@
     var g = [];
     if (s.left < 0) g.push(['bad', 'DP 超支 ' + fmtDP(-s.left) + '。']);
     if (s.count > ABILITY_CAP) g.push(['bad', '創角時最多購買 ' + ABILITY_CAP + ' 個能力，目前 ' + s.count + ' 個。']);
-    if (s.unknown) g.push(['warn', '含 ' + s.unknown + ' 個價格待補的特殊類能力，DP 未計入。']);
+    if (s.unknown) g.push(['warn', '含 ' + s.unknown + ' 個價格待補的能力，DP 未計入。']);
     var f = plan.faction && FBY[plan.faction];
     if (f) g.push(['ok', '已加入「' + f.name + '」：獲得特性［' + f.trait.name + '］' + (f.join.fee ? '，創角時免入會費 ' + fmtDP(f.join.fee) + ' DP' : '') + '。']);
     $('#p-global').innerHTML = g.map(function (m) { return '<p class="msg ' + m[0] + '">' + m[1] + '</p>'; }).join('');
