@@ -195,8 +195,23 @@
   }
 
   // ------------------------------------------------------------------ 規劃狀態
-  var plan = Object.assign({ start: START_DP, origin: '', faction: '', con: 0, cast: 0, picks: [] }, store('dex-plan') || {});
+  var ATTRS = ['力量', '敏捷', '體質', '智力', '感知', '魅力'];
+  var ATTR_EN = { 力量: 'STR', 敏捷: 'DEX', 體質: 'CON', 智力: 'INT', 感知: 'WIS', 魅力: 'CHA' };
+  var PB_COST = { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 };   // D&D 5E 標準購點
+  var PB_MIN = 8, PB_MAX = 15, ATTR_CAP = 20, FREE_PER_SPEC = 6;
+  var ORIGIN_ATTR = { 士兵: '力量', 學者: '智力', 貴族: '魅力', 浪人: '敏捷', 先知: '感知' };
+  var SPEC_BY = {};
+  CORE.specialists.forEach(function (s) { SPEC_BY[s.n] = s; });
+  // 有固定數值加成、會影響規劃頁數值的精通能力
+  var SPEC_FLAT = { '生命結晶': { hp: 50 }, '魔力之體': { mp: 10 }, '法術倉庫': { slots: 10 } };
+
+  function fill(v) { var o = {}; ATTRS.forEach(function (k) { o[k] = v; }); return o; }
+  var saved = store('dex-plan') || {};
+  var plan = Object.assign({ start: START_DP, origin: '', faction: '', budget: 27, picks: [], specs: [] }, saved);
+  plan.base = Object.assign(fill(PB_MIN), saved.base || {});
+  plan.free = Object.assign(fill(0), saved.free || {});
   plan.picks = (plan.picks || []).filter(function (p) { return BY_ID[p.id]; });
+  plan.specs = (plan.specs || []).filter(function (s) { return SPEC_BY[s.n]; });
   function savePlan() { store('dex-plan', plan); }
   function pickOf(id) { for (var i = 0; i < plan.picks.length; i++) if (plan.picks[i].id === id) return plan.picks[i]; return null; }
   function addPick(id) {
@@ -205,29 +220,72 @@
     savePlan();
   }
   function removePick(id) { plan.picks = plan.picks.filter(function (p) { return p.id !== id; }); savePlan(); }
+  function specCount(name) { return plan.specs.filter(function (s) { return s.n === name; }).length; }
+  function modOf(v) { return Math.floor((v - 10) / 2); }
+  function signed(n) { return (n >= 0 ? '+' : '−') + Math.abs(n); }
+
+  /** 屬性：購點＋起源＋成長能力＋自由分配(上限 20)，再加極限突破(可超過 20)。 */
+  function computeAttrs() {
+    var growth = {}, breaks = {}, pool = specCount('屬性值增加') * FREE_PER_SPEC, used = 0, freeUsed = 0, out = {};
+    plan.picks.forEach(function (p) {
+      var a = BY_ID[p.id], m = /^(力量|敏捷|體質|智力|感知|魅力)成長$/.exec(a.n);
+      if (m && a.src === 'core') growth[m[1]] = (growth[m[1]] || 0) + 2 * p.n;
+    });
+    plan.specs.forEach(function (s) {
+      var m = /^極限突破:(.+)$/.exec(s.n);
+      if (m) breaks[m[1]] = (breaks[m[1]] || 0) + 4;
+    });
+    ATTRS.forEach(function (k) {
+      var base = plan.base[k], org = ORIGIN_ATTR[plan.origin] === k ? 2 : 0;
+      var gr = growth[k] || 0, fr = plan.free[k] || 0, br = breaks[k] || 0;
+      used += PB_COST[base]; freeUsed += fr;
+      var pre = base + org + gr + fr, total = Math.min(pre, ATTR_CAP) + br;
+      out[k] = { base: base, org: org, gr: gr, fr: fr, br: br, pre: pre, total: total, mod: modOf(total) };
+    });
+    return { a: out, used: used, pool: pool, freeUsed: freeUsed };
+  }
+  // 移除精通能力後，把超出名額的自由分配點與「額外能力」標記收回
+  function trimToLimits() {
+    var pool = specCount('屬性值增加') * FREE_PER_SPEC, used = 0;
+    ATTRS.forEach(function (k) { used += plan.free[k]; });
+    for (var i = ATTRS.length - 1; i >= 0 && used > pool; i--) {
+      var k = ATTRS[i], cut = Math.min(plan.free[k], used - pool);
+      plan.free[k] -= cut; used -= cut;
+    }
+    var viaLeft = specCount('額外能力') * 2;
+    plan.picks.forEach(function (p) {
+      if (!p.via) return;
+      if (viaLeft >= p.n) viaLeft -= p.n; else p.via = false;
+    });
+  }
 
   function computePlan() {
-    var count = 0, spent = 0, unknown = 0, hp = 10 + plan.con, mp = Math.max(0, plan.cast), magic = 0;
-    var per = {};
+    var at = computeAttrs();
+    var con = at.a['體質'].mod;
+    var cast = Math.max(at.a['智力'].mod, at.a['感知'].mod, at.a['魅力'].mod);
+    var count = 0, spent = 0, unknown = 0, hp = 10 + con, mp = Math.max(0, cast), via = 0;
     plan.picks.forEach(function (p) {
-      var a = BY_ID[p.id];
+      var a = BY_ID[p.id], fl = FLAT[a.n];
+      if (fl) { hp += (fl.hp || 0) * p.n; mp += (fl.mp || 0) * p.n; }
+      if (p.via) { via += p.n; return; }   // 以「額外能力」取得：不花 DP、不計能力數與成長
       count += p.n;
       if (a.c == null) unknown += p.n; else spent += a.c * p.n;
-      hp += (HP_GROWTH[a.b] + plan.con) * p.n;
+      hp += (HP_GROWTH[a.b] + con) * p.n;
       mp += MP_GROWTH[a.b] * p.n;
-      if (a.b === '魔法') magic += p.n;
-      var fl = FLAT[a.n];
-      if (fl) { hp += (fl.hp || 0) * p.n; mp += (fl.mp || 0) * p.n; }
-      per[a.b] = (per[a.b] || 0) + p.n;
+    });
+    var slots = 3;
+    plan.specs.forEach(function (s) {
+      var fl = SPEC_FLAT[s.n];
+      if (fl) { hp += fl.hp || 0; mp += fl.mp || 0; slots += fl.slots || 0; }
     });
     if (plan.origin === '奧秘') mp += 5;
     if (plan.faction === 'iron') hp += 20;
-    if (plan.faction === 'arcane') mp += 3;
+    if (plan.faction === 'arcane') { mp += 3; slots += 5; }
     var prof = count >= 17 ? 6 : count >= 13 ? 5 : count >= 9 ? 4 : count >= 5 ? 3 : 2;
     var spec = 1 + Math.floor(count / 10) + (plan.origin === '特質' ? 1 : 0);
-    var slots = 3 + (plan.faction === 'arcane' ? 5 : 0);
-    return { count: count, spent: spent, unknown: unknown, left: plan.start - spent, hp: hp, mp: mp,
-             prof: prof, spec: spec, per: per, slots: slots };
+    return { count: count, spent: spent, unknown: unknown, left: plan.start - spent, hp: hp, mp: mp, prof: prof,
+             spec: spec, specUsed: plan.specs.length, slots: slots, con: con, cast: cast, attrs: at,
+             via: via, viaLimit: specCount('額外能力') * 2, nextSpecAt: (Math.floor(count / 10) + 1) * 10 };
   }
   function pickMessages(a) {
     var msgs = [];
@@ -244,6 +302,11 @@
     var clash = a.exclIds.filter(function (id) { return pickOf(id); });
     if (clash.length) msgs.push(['bad', '不可與 ' + clash.map(function (id) { return BY_ID[id].n; }).join('、') + ' 同時具有。']);
     if (a.extra && !a.trait) msgs.push(['warn', '另需符合：' + a.req]);
+    var m = /^(力量|敏捷|體質|智力|感知|魅力)成長$/.exec(a.n);
+    if (m && a.src === 'core') {
+      var at = computeAttrs().a[m[1]];
+      if (at.pre > ATTR_CAP) msgs.push(['warn', m[1] + '已超過 20，超出的部分不計入（極限突破除外）。']);
+    }
     return msgs;
   }
 
@@ -590,11 +653,14 @@
     var page = $('[data-page="planner"]');
     page.innerHTML =
       '<div class="page-head"><span class="eyebrow">角色創造工具</span><h1>購點規劃</h1>' +
-      '<p class="lede">挑選要購買的能力，即時計算剩餘 DP、熟練加值、生命值與魔力，並檢查先決條件與勢力限制。規劃只存在這個瀏覽器中。</p></div>' +
-      '<div class="planner"><div class="main-col" style="display:grid;gap:16px;min-width:0">' +
-        '<div class="picker"><input class="search" id="p-q" type="search" placeholder="搜尋能力並加入，例如：額外攻擊" autocomplete="off"><ul class="picker-results" id="p-res" hidden></ul></div>' +
-        '<div id="p-global"></div>' +
-        '<ul class="plist" id="p-list"></ul>' +
+      '<p class="lede">配置 27 點購點屬性、選擇精通能力、挑選要購買的能力，即時計算剩餘 DP、熟練加值、生命值與魔力，並檢查先決條件與勢力限制。規劃只存在這個瀏覽器中。</p></div>' +
+      '<div class="planner"><div class="main-col" style="display:grid;gap:20px;min-width:0">' +
+        '<section class="card" id="p-attrs" aria-label="屬性值"></section>' +
+        '<section class="card" id="p-specs" aria-label="精通能力"></section>' +
+        '<section class="block" aria-label="能力"><h2>能力</h2>' +
+          '<div class="picker"><input class="search" id="p-q" type="search" placeholder="搜尋能力並加入，例如：額外攻擊" autocomplete="off"><ul class="picker-results" id="p-res" hidden></ul></div>' +
+          '<div id="p-global"></div>' +
+          '<ul class="plist" id="p-list"></ul></section>' +
         '<div class="filter-row"><button type="button" class="btn ghost small" id="p-copy">複製角色摘要</button><span id="p-clear-wrap"></span></div>' +
         '<textarea class="copy-out" id="p-out" hidden readonly></textarea>' +
       '</div><aside class="side">' +
@@ -603,18 +669,51 @@
           '<div class="field-row"><label class="field">起始 DP<input id="p-start" type="number" step="500" min="0"></label>' +
           '<label class="field">起源<select id="p-origin"><option value="">未選</option>' + ORIGINS.map(function (o) { return '<option value="' + o.id + '">' + o.id + '</option>'; }).join('') + '</select></label></div>' +
           '<label class="field">勢力<select id="p-faction"><option value="">不加入</option>' + FACTIONS.map(function (f) { return '<option value="' + f.id + '">' + f.name + '</option>'; }).join('') + '</select></label>' +
-          '<div class="field-row"><label class="field">體質調整值<input id="p-con" type="number" min="-5" max="10"></label>' +
-          '<label class="field">智/感/魅最高調整值<input id="p-cast" type="number" min="-5" max="10"></label></div>' +
           '<p class="req-raw" id="p-notes"></p>' +
         '</div></aside></div>';
 
     $('#p-start').value = plan.start; $('#p-origin').value = plan.origin; $('#p-faction').value = plan.faction;
-    $('#p-con').value = plan.con; $('#p-cast').value = plan.cast;
-    [['start', 'p-start'], ['con', 'p-con'], ['cast', 'p-cast']].forEach(function (x) {
-      $('#' + x[1]).addEventListener('input', function (e) { plan[x[0]] = parseInt(e.target.value, 10) || 0; savePlan(); renderPlanner(); });
-    });
+    $('#p-start').addEventListener('input', function (e) { plan.start = parseInt(e.target.value, 10) || 0; savePlan(); renderPlanner(); });
     $('#p-origin').addEventListener('change', function (e) { plan.origin = e.target.value; savePlan(); renderPlanner(); });
     $('#p-faction').addEventListener('change', function (e) { plan.faction = e.target.value; savePlan(); renderPlanner(); });
+
+    // 屬性：購點與自由分配的加減
+    $('#p-attrs').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-op]'); if (!b || b.disabled) return;
+      var k = b.getAttribute('data-attr'), op = b.getAttribute('data-op');
+      if (op === 'base+') plan.base[k] = Math.min(PB_MAX, plan.base[k] + 1);
+      if (op === 'base-') plan.base[k] = Math.max(PB_MIN, plan.base[k] - 1);
+      if (op === 'free+') plan.free[k]++;
+      if (op === 'free-') plan.free[k] = Math.max(0, plan.free[k] - 1);
+      if (op === 'reset') { plan.base = fill(PB_MIN); plan.free = fill(0); }
+      savePlan(); renderPlanner();
+    });
+    $('#p-attrs').addEventListener('input', function (e) {
+      if (e.target.id !== 'p-budget') return;
+      plan.budget = Math.max(0, parseInt(e.target.value, 10) || 0); savePlan(); renderPlanner(true);
+    });
+
+    // 精通能力：選擇、移除、填寫選項
+    $('#p-specs').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-spec-act]'); if (!b || b.disabled) return;
+      var act = b.getAttribute('data-spec-act');
+      if (act === 'add') {
+        var name = $('#p-spec-sel').value; if (!name) return;
+        var k = plan.specs.reduce(function (m, s) { return Math.max(m, s.k || 0); }, 0) + 1;
+        plan.specs.push({ k: k, n: name, c: '' });
+      }
+      if (act === 'rm') {
+        var key = +b.getAttribute('data-k');
+        plan.specs = plan.specs.filter(function (s) { return s.k !== key; });
+        trimToLimits();
+      }
+      savePlan(); renderPlanner();
+    });
+    $('#p-specs').addEventListener('input', function (e) {
+      var key = e.target.getAttribute('data-k'); if (!key) return;
+      plan.specs.forEach(function (s) { if (s.k === +key) s.c = e.target.value; });
+      savePlan();
+    });
 
     var q = $('#p-q'), res = $('#p-res');
     function drawResults() {
@@ -637,11 +736,13 @@
       renderPlanner();
     });
     $('#p-list').addEventListener('click', function (e) {
-      var b = e.target.closest('[data-act]'); if (!b) return;
+      var b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
       var id = b.getAttribute('data-id'), p = pickOf(id), act = b.getAttribute('data-act');
       if (act === 'rm') removePick(id);
-      if (act === 'inc' && p) { p.n++; savePlan(); }
-      if (act === 'dec' && p) { p.n--; if (p.n <= 0) removePick(id); else savePlan(); }
+      if (act === 'inc' && p) p.n++;
+      if (act === 'dec' && p) { p.n--; if (p.n <= 0) removePick(id); }
+      if (act === 'via' && p) p.via = !p.via;
+      trimToLimits(); savePlan();
       renderPlanner();
     });
     $('#p-copy').addEventListener('click', function () {
@@ -656,20 +757,97 @@
       var v = b.getAttribute('data-clear');
       if (v === 'ask') confirmClear = true;
       if (v === 'no') confirmClear = false;
-      if (v === 'yes') { plan.picks = []; savePlan(); confirmClear = false; }
+      if (v === 'yes') { plan.picks = []; plan.specs = []; plan.base = fill(PB_MIN); plan.free = fill(0); savePlan(); confirmClear = false; }
       renderPlanner();
     });
     plannerBuilt = true;
   }
-  function renderPlanner() {
+
+  function stepper(k, op, val, canDec, canInc, label) {
+    return '<span class="stepper">' +
+      '<button class="icon-btn" type="button" data-attr="' + k + '" data-op="' + op + '-"' + (canDec ? '' : ' disabled') + ' aria-label="' + k + label + '減少">−</button>' +
+      '<span class="num">' + val + '</span>' +
+      '<button class="icon-btn" type="button" data-attr="' + k + '" data-op="' + op + '+"' + (canInc ? '' : ' disabled') + ' aria-label="' + k + label + '增加">＋</button></span>';
+  }
+  function renderAttrs(s, keepBudgetFocus) {
+    var at = s.attrs, left = plan.budget - at.used, freeLeft = at.pool - at.freeUsed;
+    var rows = ATTRS.map(function (k) {
+      var x = at.a[k];
+      var nextCost = x.base < PB_MAX ? PB_COST[x.base + 1] - PB_COST[x.base] : 0;
+      return '<tr' + (x.pre > ATTR_CAP ? ' class="over"' : '') + '><th scope="row">' + k + ' <span class="en">' + ATTR_EN[k] + '</span></th>' +
+        '<td class="num total">' + x.total + '</td>' +
+        '<td class="num mod">' + signed(x.mod) + '</td>' +
+        '<td>' + stepper(k, 'base', x.base, x.base > PB_MIN, x.base < PB_MAX && nextCost <= left, '購點') + '</td>' +
+        '<td class="num muted">' + PB_COST[x.base] + '</td>' +
+        '<td class="num">' + (x.org ? '+' + x.org : '—') + '</td>' +
+        '<td class="num">' + (x.gr ? '+' + x.gr : '—') + '</td>' +
+        (at.pool ? '<td>' + stepper(k, 'free', x.fr, x.fr > 0, freeLeft > 0 && x.pre < ATTR_CAP, '自由分配') + '</td>' : '') +
+        '<td class="num">' + (x.br ? '+' + x.br : '—') + '</td></tr>';
+    }).join('');
+    var msgs = [];
+    msgs.push([left < 0 ? 'bad' : left === 0 ? 'ok' : 'warn', '購點已用 ' + at.used + ' / ' + plan.budget + ' 點' + (left < 0 ? '，超出 ' + (-left) + ' 點。' : left === 0 ? '，剛好用完。' : '，還剩 ' + left + ' 點。')]);
+    if (at.pool) msgs.push([freeLeft < 0 ? 'bad' : freeLeft === 0 ? 'ok' : 'warn', '屬性值增加：可自由分配 ' + at.pool + ' 點，已分配 ' + at.freeUsed + ' 點' + (freeLeft > 0 ? '，還剩 ' + freeLeft + ' 點。' : '。')]);
+    ATTRS.forEach(function (k) { if (at.a[k].pre > ATTR_CAP) msgs.push(['warn', k + ' 在極限突破前為 ' + at.a[k].pre + '，超過 20 的部分不計入。']); });
+
+    var budgetInput = $('#p-budget');
+    var focused = keepBudgetFocus && budgetInput && document.activeElement === budgetInput;
+    var html =
+      '<div class="card-head"><h3>屬性值</h3><span class="inline-confirm">' +
+        '<label class="field inline">購點總額 <input id="p-budget" type="number" min="0" max="99" value="' + plan.budget + '"></label>' +
+        '<button class="btn ghost small" type="button" data-op="reset">重設</button></span></div>' +
+      '<div class="table-wrap"><table class="attr-table"><thead><tr><th>屬性</th><th class="num">總值</th><th class="num">調整值</th><th>購點</th><th class="num">花費</th><th class="num">起源</th><th class="num">成長能力</th>' +
+        (at.pool ? '<th>自由分配</th>' : '') + '<th class="num">極限突破</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div class="msgs-block">' + msgs.map(function (m) { return '<p class="msg ' + m[0] + '">' + esc(m[1]) + '</p>'; }).join('') + '</div>' +
+      '<p class="req-raw">購點值 8–15，花費 8=0、9=1、10=2、11=3、12=4、13=5、14=7、15=9。起源、【通用】X成長 與精通能力「屬性值增加」合計最高到 20；「極限突破」可以超過 20。</p>';
+    if (focused) {
+      // 正在輸入購點總額時，只更新表格與訊息，不重建輸入框
+      var tmp = document.createElement('div'); tmp.innerHTML = html;
+      $('#p-attrs .table-wrap').replaceWith(tmp.querySelector('.table-wrap'));
+      $('#p-attrs .msgs-block').replaceWith(tmp.querySelector('.msgs-block'));
+    } else {
+      $('#p-attrs').innerHTML = html;
+    }
+  }
+  function renderSpecs(s) {
+    var free = s.spec - s.specUsed;
+    var rows = plan.specs.map(function (sp) {
+      var def = SPEC_BY[sp.n];
+      var effect = sp.n === '屬性值增加' ? '在上方屬性表的「自由分配」欄分配 6 點。'
+        : /^極限突破/.test(sp.n) ? '已自動加到屬性表。'
+        : sp.n === '額外能力' ? '在下方能力清單按「以額外能力取得」，最多 2 個。'
+        : SPEC_FLAT[sp.n] ? '已計入右側數值。' : '';
+      return '<li class="prow" data-b="特殊"><span class="nm">' + esc(sp.n) + '</span>' +
+        '<span class="ctl"><button class="icon-btn" type="button" data-spec-act="rm" data-k="' + sp.k + '" aria-label="移除 ' + esc(sp.n) + '">✕</button></span>' +
+        '<span class="msgs">' +
+          (def.opt && sp.n !== '額外能力' ? '<input class="spec-choice" type="text" data-k="' + sp.k + '" value="' + esc(sp.c || '') + '" placeholder="選擇：' + esc(def.opt) + '" aria-label="' + esc(sp.n) + ' 的選擇">' : '') +
+          '<span class="req-raw">' + fmt(def.t[0]) + (effect ? '　<strong>' + effect + '</strong>' : '') + '</span></span></li>';
+    }).join('');
+    var options = '<option value="">選擇精通能力…</option>' + CORE.specialists.map(function (sp) {
+      var have = specCount(sp.n);
+      return '<option value="' + esc(sp.n) + '">' + esc(sp.n) + (have ? '（已有 ' + have + '）' : '') + '</option>';
+    }).join('');
+    var hint = '創角 1 個，能力數每滿 10 個再 +1（目前 ' + s.count + ' 個能力）' + (plan.origin === '特質' ? '，特質起源 +1' : '') + '。';
+    if (free <= 0) hint += ' 再購買 ' + (s.nextSpecAt - s.count) + ' 個能力可以再選一個。';
+    $('#p-specs').innerHTML =
+      '<div class="card-head"><h3>精通能力</h3><span class="tag-count' + (free < 0 ? ' bad' : '') + '">已選 ' + s.specUsed + ' / 可選 ' + s.spec + '</span></div>' +
+      '<p class="req-raw">' + hint + ' 同名精通能力可以重複選擇。<a href="#specialists">看全部精通能力</a></p>' +
+      (free < 0 ? '<p class="msg bad">精通能力超出名額 ' + (-free) + ' 個，請移除或購買更多能力。</p>' : '') +
+      (rows ? '<ul class="plist">' + rows + '</ul>' : '') +
+      '<div class="filter-row"><select id="p-spec-sel" aria-label="選擇精通能力"' + (free > 0 ? '' : ' disabled') + '>' + options + '</select>' +
+      '<button class="btn small" type="button" data-spec-act="add"' + (free > 0 ? '' : ' disabled') + '>選擇</button>' +
+      (free > 0 ? '<span class="msg ok">還可以選 ' + free + ' 個。</span>' : '') + '</div>';
+  }
+  function renderPlanner(keepBudgetFocus) {
     var s = computePlan();
+    renderAttrs(s, keepBudgetFocus);
+    renderSpecs(s);
     var cntCls = s.count > ABILITY_CAP ? ' bad' : '';
     $('#p-tiles').innerHTML =
       '<div class="tile ' + (s.left < 0 ? 'bad' : 'accent') + '"><span class="k">剩餘 DP</span><span class="v">' + fmtDP(s.left) + '</span>' +
         '<div class="meter' + (s.left < 0 ? ' over' : '') + '"><i style="width:' + Math.min(100, plan.start ? s.spent / plan.start * 100 : 0) + '%"></i></div></div>' +
       '<div class="tile' + cntCls + '"><span class="k">能力數</span><span class="v">' + s.count + '<small> / ' + ABILITY_CAP + '</small></span></div>' +
       '<div class="tile"><span class="k">熟練加值</span><span class="v">+' + s.prof + '</span></div>' +
-      '<div class="tile"><span class="k">精通能力</span><span class="v">' + s.spec + '<small> 個</small></span></div>' +
+      '<div class="tile' + (s.specUsed > s.spec ? ' bad' : '') + '"><span class="k">精通能力</span><span class="v">' + s.specUsed + '<small> / ' + s.spec + '</small></span></div>' +
       '<div class="tile"><span class="k">最大生命值</span><span class="v">' + s.hp + '</span></div>' +
       '<div class="tile"><span class="k">魔力 MP</span><span class="v">' + s.mp + '</span></div>' +
       '<div class="tile"><span class="k">生命骰</span><span class="v">' + s.count + '<small>d10</small></span></div>' +
@@ -679,41 +857,60 @@
     if (s.left < 0) g.push(['bad', 'DP 超支 ' + fmtDP(-s.left) + '。']);
     if (s.count > ABILITY_CAP) g.push(['bad', '創角時最多購買 ' + ABILITY_CAP + ' 個能力，目前 ' + s.count + ' 個。']);
     if (s.unknown) g.push(['warn', '含 ' + s.unknown + ' 個價格待補的能力，DP 未計入。']);
+    if (s.via > s.viaLimit) g.push(['bad', '以「額外能力」取得的能力超過 ' + s.viaLimit + ' 個。']);
     var f = plan.faction && FBY[plan.faction];
     if (f) g.push(['ok', '已加入「' + f.name + '」：獲得特性［' + f.trait.name + '］' + (f.join.fee ? '，創角時免入會費 ' + fmtDP(f.join.fee) + ' DP' : '') + '。']);
     $('#p-global').innerHTML = g.map(function (m) { return '<p class="msg ' + m[0] + '">' + m[1] + '</p>'; }).join('');
 
-    var notes = ['生命值＝10＋體質調整值＋各能力依分支成長（含體質調整值）。'];
+    var notes = ['體質調整值 ' + signed(s.con) + '、施法調整值 ' + signed(s.cast) + '（取自屬性表）。',
+                 '生命值＝10＋體質調整值＋各能力依分支成長（含體質調整值）；魔力＝施法調整值＋魔法類能力數。'];
     if (plan.origin === '奧秘') notes.push('奧秘起源：魔力 +5。');
     if (plan.faction === 'iron') notes.push('帝國烙印：最大生命值 +20；消耗魔力時會受到反噬傷害。');
     if (plan.faction === 'arcane') notes.push('秘術祕紋：魔力 +3、法術容量 +5。');
     if (pickOf(BY_NAME['龍之血脈'] && BY_NAME['龍之血脈'].id)) notes.push('龍之血脈：生命值 +1，之後每習得一個能力再 +1，未自動計入。');
     $('#p-notes').textContent = notes.join(' ');
 
+    var viaLeft = s.viaLimit - s.via;
     var items = plan.picks.map(function (p) { return { p: p, a: BY_ID[p.id] }; });
     $('#p-list').innerHTML = items.length ? items.map(function (x) {
       var a = x.a, p = x.p, msgs = pickMessages(a);
       var ctl = a.rep
-        ? '<button class="icon-btn" type="button" data-act="dec" data-id="' + a.id + '" aria-label="減少">−</button><span class="num">×' + p.n + '</span><button class="icon-btn" type="button" data-act="inc" data-id="' + a.id + '" aria-label="增加">＋</button>'
+        ? '<button class="icon-btn" type="button" data-act="dec" data-id="' + a.id + '" aria-label="減少">−</button><span class="num">×' + p.n + '</span><button class="icon-btn" type="button" data-act="inc" data-id="' + a.id + '" aria-label="增加"' + (p.via && viaLeft <= 0 ? ' disabled' : '') + '>＋</button>'
         : '';
+      var viaBtn = (s.viaLimit || p.via)
+        ? '<button class="btn ghost small via" type="button" data-act="via" data-id="' + a.id + '" aria-pressed="' + !!p.via + '"' + (!p.via && viaLeft < p.n ? ' disabled' : '') + '>' + (p.via ? '✓ 額外能力' : '以額外能力取得') + '</button>'
+        : '';
+      if (p.via) msgs.unshift(['ok', '以精通能力「額外能力」取得：視為特性，不花 DP、不計入能力數與生命值／魔力成長。']);
       return '<li class="prow" data-b="' + a.b + '"><span class="nm"><a href="#a-' + a.id + '">' + esc(a.n) + '</a>' + branchChip(a.b) + (a.src === 'faction' ? factionChip(a.f) : '') + '</span>' +
-        '<span class="ctl"><span class="dp" style="color:var(--accent)">' + (a.c == null ? '待補' : fmtDP(a.c * p.n)) + '</span>' + ctl +
+        '<span class="ctl">' + viaBtn + '<span class="dp" style="color:var(--accent)">' + (p.via ? '特性' : a.c == null ? '待補' : fmtDP(a.c * p.n)) + '</span>' + ctl +
         '<button class="icon-btn" type="button" data-act="rm" data-id="' + a.id + '" aria-label="移除 ' + esc(a.n) + '">✕</button></span>' +
         (msgs.length ? '<span class="msgs">' + msgs.map(function (m) { return '<span class="msg ' + m[0] + '">' + esc(m[1]) + '</span>'; }).join('') + '</span>' : '') +
         '</li>';
     }).join('') : '<li class="empty">還沒有選擇能力。用上方搜尋框加入，或在<a href="#abilities">能力目錄</a>按「加入購點規劃」。</li>';
 
-    $('#p-clear-wrap').innerHTML = !items.length ? '' : confirmClear
-      ? '<span class="inline-confirm">確定清空全部 ' + items.length + ' 項？<button class="btn small" type="button" data-clear="yes">清空</button><button class="btn ghost small" type="button" data-clear="no">取消</button></span>'
+    var hasAny = items.length || plan.specs.length;
+    $('#p-clear-wrap').innerHTML = !hasAny ? '' : confirmClear
+      ? '<span class="inline-confirm">確定清空屬性、精通能力與全部 ' + items.length + ' 個能力？<button class="btn small" type="button" data-clear="yes">清空</button><button class="btn ghost small" type="button" data-clear="no">取消</button></span>'
       : '<button class="btn ghost small" type="button" data-clear="ask">清空規劃</button>';
   }
   function summaryText() {
     var s = computePlan(), lines = [];
     lines.push('【深淵的探索者 角色購點】');
     lines.push('起源：' + (plan.origin ? plan.origin + '起源' : '未選') + '　勢力：' + (plan.faction ? FBY[plan.faction].name : '無'));
+    lines.push('屬性：' + ATTRS.map(function (k) { var x = s.attrs.a[k]; return k + ' ' + x.total + '(' + signed(x.mod) + ')'; }).join('　') +
+               '　〔購點 ' + s.attrs.used + '/' + plan.budget + '〕');
     lines.push('DP：花費 ' + fmtDP(s.spent) + ' / ' + fmtDP(plan.start) + '（剩餘 ' + fmtDP(s.left) + '）');
-    lines.push('能力數 ' + s.count + '　熟練加值 +' + s.prof + '　精通能力 ' + s.spec + ' 個');
+    lines.push('能力數 ' + s.count + '　熟練加值 +' + s.prof + '　精通能力 ' + s.specUsed + '/' + s.spec);
     lines.push('最大生命值 ' + s.hp + '　魔力 ' + s.mp + '　生命骰 ' + s.count + 'd10　法術容量 ' + s.slots);
+    if (plan.specs.length) {
+      lines.push('');
+      lines.push('〔精通能力〕');
+      plan.specs.forEach(function (sp) {
+        var extra = sp.c ? '：' + sp.c : '';
+        if (sp.n === '屬性值增加') extra = '：' + ATTRS.filter(function (k) { return plan.free[k]; }).map(function (k) { return k + '+' + plan.free[k]; }).join('、');
+        lines.push('・' + sp.n + extra);
+      });
+    }
     lines.push('');
     BRANCHES.forEach(function (b) {
       var list = plan.picks.filter(function (p) { return BY_ID[p.id].b === b; });
@@ -721,7 +918,7 @@
       lines.push('〔' + b + '〕');
       list.forEach(function (p) {
         var a = BY_ID[p.id];
-        lines.push('・' + a.n + (p.n > 1 ? ' ×' + p.n : '') + '（' + (a.c == null ? '價格待補' : fmtDP(a.c * p.n) + ' DP') + '）');
+        lines.push('・' + a.n + (p.n > 1 ? ' ×' + p.n : '') + '（' + (p.via ? '額外能力' : a.c == null ? '價格待補' : fmtDP(a.c * p.n) + ' DP') + '）');
       });
     });
     return lines.join('\n');
