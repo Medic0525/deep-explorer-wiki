@@ -208,7 +208,8 @@ td.num, th.num { text-align: right; }
 
 /* inline rule text */
 .term { font-weight: 500; border-bottom: 1px dotted var(--muted); }
-.tag { font-size: .86em; color: var(--muted); background: var(--surface-2); padding: 0 5px; border-radius: 4px; white-space: nowrap; }
+.tag { font-size: .86em; color: var(--muted); background: var(--surface-2); padding: 0 5px; border-radius: 4px; white-space: nowrap; text-decoration: none; cursor: pointer; }
+.tag:hover { color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .dice { font-family: var(--font-mono); font-weight: 600; color: var(--accent); white-space: nowrap; }
 .spell { font-style: normal; color: var(--b-魔法); }
 .aref { color: var(--bc); text-decoration: none; border-bottom: 1px solid currentColor; font-weight: 500; }
