@@ -382,3 +382,25 @@ td.num, th.num { text-align: right; }
 @media (prefers-reduced-motion: no-preference) {
   .arow, .nav a, .fab { transition: background-color .12s, border-color .12s; }
 }
+
+/* ---------- planner: attributes & specialists ---------- */
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
+.card-head h3 { font-size: 18px; }
+.field.inline { display: inline-flex; align-items: center; gap: 6px; }
+.field.inline input { width: 4.5em; padding: 3px 8px; }
+.stepper { display: inline-flex; align-items: center; gap: 6px; }
+.stepper .num { min-width: 1.6em; text-align: center; font-weight: 600; }
+.icon-btn:disabled { opacity: .35; cursor: default; }
+.attr-table th[scope="row"] { color: var(--fg); font-size: 14px; letter-spacing: 0; background: transparent; }
+.attr-table .en { font-family: var(--font-mono); font-size: 11px; color: var(--muted); font-weight: 400; }
+.attr-table td { vertical-align: middle; }
+.attr-table .muted { color: var(--muted); }
+.attr-table .total { font-family: var(--font-mono); font-size: 18px; font-weight: 600; }
+.attr-table .mod { font-family: var(--font-mono); color: var(--accent); font-weight: 600; }
+.attr-table tr.over .total { color: var(--warn); }
+.msgs-block { display: grid; gap: 2px; font-size: 13.5px; }
+.tag-count { font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
+.tag-count.bad { color: var(--bad); }
+.spec-choice { width: 100%; padding: 5px 9px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--fg); font-size: 14px; }
+#p-spec-sel { padding: 5px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); max-width: 100%; }
+.btn.via[aria-pressed="true"] { background: var(--accent-soft); }
