@@ -35,11 +35,14 @@ REF_ALIASES = {
 
 def fix_chars(s):
     """PDF 字型把部分漢字輸出成康熙部首(⿊、⼆、⽬…)，轉回一般漢字。"""
+    s = s.replace('⻑', '長')
     return ''.join(unicodedata.normalize('NFKC', c) if 0x2E80 <= ord(c) <= 0x2FDF else c for c in s)
 
 
 def tidy(s):
     """移除 PDF 換行留下的中文字間空白。"""
+    # 「標記(詛咒)」這類括號註記與 #詛咒 同義
+    s = re.sub(r'([（(])\s*詛咒\s*([)）])', r'\1#詛咒 \2', s)
     # 規則書用「#長休」這類標籤，標籤以空白結尾；先包成 {#長休} 以免空白被移除
     s = re.sub(r'#\s?([^\s#()（）\[\]［］{}，。、；：]+)', r'{#\1}', s)
     cjk = r'[　-〿一-鿿＀-￯「」『』（）{}]'
@@ -47,6 +50,8 @@ def tidy(s):
     # PDF 斷行把標籤切成兩段(#詛 咒)
     for a, b in (('詛', '咒'), ('盾', '牌'), ('刺', '劍'), ('敏捷', '豁免')):
         s = s.replace('{#%s}%s' % (a, b), '{#%s%s}' % (a, b))
+    for a, b in (('長修', '長休'), ('短修', '短休')):  # 同義標籤
+        s = s.replace('{#%s}' % a, '{#%s}' % b)
     return s.strip()
 
 

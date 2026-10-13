@@ -15,6 +15,22 @@
     '魔力增加': { mp: 2 }
   };
 
+  // 標籤分類：決定篩選選單的分組與順序，沒列到的歸入「其他」
+  var TAG_SYN = { '長修': '長休', '短修': '短休' };
+  var TAG_GROUPS = [
+    ['狀態與效果', ['詛咒', '異常狀態', '疾病', '隱形', '死亡', '靈光', '抗性', '專注']],
+    ['生物類型', ['不死生物', '邪魔', '構裝體', '巨型', '小型', '動物夥伴', '動物兵']],
+    ['休息', ['長休', '短休']],
+    ['豁免與檢定', ['豁免', '豁免檢定', '力量豁免', '敏捷豁免', '體質豁免', '智力豁免', '感知豁免', '魅力豁免',
+                    '攻擊命中', '攻擊檢定', '力量檢定', '體質檢定', '感知檢定']],
+    ['攻擊', ['攻擊', '武器攻擊', '近戰攻擊', '徒手打擊', '徒手攻擊', '射程', '傷害類型', 'AC']],
+    ['武器', ['簡易武器', '軍用武器', '長劍', '短劍', '彎刀', '刺劍', '契約武器', '暴雷加農砲', '雙手', '可雙手',
+              '輕型', '靈巧', '觸及', '雙武器', '再裝填', '彈藥', '爆彈']],
+    ['防具', ['盾牌', '護甲', '中甲', '重甲', '護身符']],
+    ['法術與施法', ['法術', '咒法系', '姿勢', '聲音', '材料', '奧術法器']],
+    ['物品與工具', ['工具組', '藥劑', '毒藥', '消耗品']]
+  ];
+
   var ORIGINS = [
     { id: '士兵', bonus: ['屬性值：力量 +2', '{#軍用武器} 熟練', '{#輕甲}、{#中甲}、{#重甲}、{#盾牌} 熟練'],
       traits: [['快速休整', '當你消耗 [生命骰] 回復 [生命值 Hit Point] 時，每顆生命骰額外回復 5 點生命值。']] },
@@ -73,7 +89,15 @@
     a.groups.forEach(function (g) { g.ids.forEach(function (id) { if (a.refIds.indexOf(id) < 0) a.refIds.push(id); }); });
     a.refIds.forEach(function (id) { (UNLOCKS[id] = UNLOCKS[id] || []).push(a.id); });
     a.hay = (a.n + ' ' + (a.req || '') + ' ' + a.t.join(' ')).toLowerCase();
+    a.tags = [];
+    (a.t.join(' ') + ' ' + (a.req || '')).replace(/\{#([^}]+)\}/g, function (m, x) {
+      x = TAG_SYN[x] || x;
+      if (a.tags.indexOf(x) < 0) a.tags.push(x);
+    });
   });
+  var TAG_COUNT = {};
+  ALL.forEach(function (a) { a.tags.forEach(function (x) { TAG_COUNT[x] = (TAG_COUNT[x] || 0) + 1; }); });
+  function mentions(a, tag) { return a.tags.indexOf(tag) >= 0 || a.hay.indexOf(tag.toLowerCase()) >= 0; }
   ALL.forEach(function (a) { a.order = ALL.indexOf(a); });
 
   var STATS = {
@@ -107,7 +131,10 @@
     var s = esc(text);
     s = s.replace(/(^|[^A-Za-z0-9#-])(\d*[dD]\d+(?:\s*[+＋]\s*\d+)?)(?![A-Za-z0-9])/g, '$1<b class="dice">$2</b>');
     s = s.replace(REF_RE, function (m, b, n) { return refLink(n, '【' + (b === '敏捷' ? '靈敏' : b) + '】' + n.trim()); });
-    s = s.replace(/\{#([^}]+)\}/g, '<span class="tag">#$1</span>');
+    s = s.replace(/\{#([^}]+)\}/g, function (m, x) {
+      x = TAG_SYN[x] || x;
+      return '<a class="tag" href="#abilities" data-tag="' + x + '" title="列出所有標有 #' + x + ' 的能力">#' + x + '</a>';
+    });
     s = s.replace(/[\[［]([^\[\]［］<>]{1,40})[\]］]/g, '<span class="term">$1</span>');
     s = s.replace(/『([^』]+)』/g, '<span class="spell">『$1』</span>');
     return s;
@@ -257,7 +284,9 @@
   })();
 
   // ------------------------------------------------------------------ 能力目錄
-  var F = Object.assign({ q: '', b: 'all', src: 'all', cost: 'all', entry: false, rep: false, sort: 'book' }, store('dex-filters') || {});
+  var F_DEFAULT = { q: '', b: 'all', src: 'all', cost: 'all', entry: false, rep: false, sort: 'book', tag: '', tagWide: false };
+  var F = Object.assign({}, F_DEFAULT, store('dex-filters') || {});
+  if (F.tag && !TAG_COUNT[F.tag]) F.tag = '';
   var listLimit = 150, catalogBuilt = false, selectedId = null;
 
   function costBucket(c) {
@@ -274,6 +303,7 @@
       if (F.cost !== 'all' && costBucket(a.c) !== F.cost) return false;
       if (F.entry && a.req) return false;
       if (F.rep && !a.rep) return false;
+      if (F.tag && !(F.tagWide ? mentions(a, F.tag) : a.tags.indexOf(F.tag) >= 0)) return false;
       for (var i = 0; i < terms.length; i++) if (a.hay.indexOf(terms[i]) < 0) return false;
       return true;
     });
@@ -311,6 +341,23 @@
     ALL.forEach(function (a) { var k = fn(a); o[k] = (o[k] || 0) + 1; });
     return o;
   }
+  function tagOptions() {
+    var seen = {}, html = '<option value="">全部</option>';
+    function opt(x) { seen[x] = 1; return '<option value="' + x + '">#' + x + '（' + TAG_COUNT[x] + '）</option>'; }
+    TAG_GROUPS.forEach(function (g) {
+      var list = g[1].filter(function (x) { return TAG_COUNT[x]; });
+      if (list.length) html += '<optgroup label="' + g[0] + '">' + list.map(opt).join('') + '</optgroup>';
+    });
+    var rest = Object.keys(TAG_COUNT).filter(function (x) { return !seen[x]; }).sort(function (x, y) { return TAG_COUNT[y] - TAG_COUNT[x]; });
+    if (rest.length) html += '<optgroup label="其他">' + rest.map(opt).join('') + '</optgroup>';
+    return html;
+  }
+  function syncControls() {
+    $('#f-q').value = F.q; $('#f-src').value = F.src; $('#f-cost').value = F.cost; $('#f-sort').value = F.sort;
+    $('#f-entry').checked = F.entry; $('#f-rep').checked = F.rep;
+    $('#f-tag').value = F.tag; $('#f-tagwide').checked = F.tagWide;
+    $('#f-tagwide-wrap').hidden = !F.tag;
+  }
   function buildCatalog() {
     var page = $('[data-page="abilities"]');
     var bc = countBy(function (a) { return a.b; }), sc = countBy(function (a) { return a.src; });
@@ -328,6 +375,9 @@
         '<label>價格 <select id="f-cost"><option value="all">全部</option><option value="low">1,000 以下</option><option value="mid">1,500–2,000</option><option value="high">2,500 以上</option><option value="unknown">未知</option></select></label>' +
         '<label>排序 <select id="f-sort"><option value="book">規則書順序</option><option value="cost-asc">價格低→高</option><option value="cost-desc">價格高→低</option><option value="name">名稱</option></select></label>' +
       '</div><div class="filter-row">' +
+        '<label>標籤 <select id="f-tag">' + tagOptions() + '</select></label>' +
+        '<label id="f-tagwide-wrap"><input type="checkbox" id="f-tagwide"> 也列出說明中提到的</label>' +
+      '</div><div class="filter-row">' +
         '<label><input type="checkbox" id="f-entry"> 只看無先決條件</label>' +
         '<label><input type="checkbox" id="f-rep"> 只看可重複購買</label>' +
         '<span class="result-count" id="f-count"></span>' +
@@ -335,14 +385,15 @@
       '<ul class="alist" id="alist"></ul></div>' +
       '<aside class="detail" id="detail" aria-live="polite"></aside></div>';
 
-    $('#f-q').value = F.q; $('#f-src').value = F.src; $('#f-cost').value = F.cost; $('#f-sort').value = F.sort;
-    $('#f-entry').checked = F.entry; $('#f-rep').checked = F.rep;
+    syncControls();
     function changed() { listLimit = 150; store('dex-filters', F); renderList(); }
     $('#f-q').addEventListener('input', function (e) { F.q = e.target.value; changed(); });
     $('#f-b').addEventListener('click', function (e) {
       var b = e.target.closest('button'); if (!b) return;
       F.b = b.getAttribute('data-v'); changed();
     });
+    $('#f-tag').addEventListener('change', function (e) { F.tag = e.target.value; $('#f-tagwide-wrap').hidden = !F.tag; changed(); });
+    $('#f-tagwide').addEventListener('change', function (e) { F.tagWide = e.target.checked; changed(); });
     ['src', 'cost', 'sort'].forEach(function (k) {
       $('#f-' + k).addEventListener('change', function (e) { F[k] = e.target.value; changed(); });
     });
@@ -357,7 +408,7 @@
   function renderList() {
     $$('#f-b button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-v') === F.b)); });
     var res = filtered();
-    $('#f-count').textContent = '符合 ' + res.length + ' 個';
+    $('#f-count').textContent = '符合 ' + res.length + ' 個' + (F.tag ? '（#' + F.tag + (F.tagWide ? '，含說明中提到' : '') + '）' : '');
     var html = res.slice(0, listLimit).map(rowHTML).join('');
     if (!res.length) html = '<li class="empty">沒有符合的能力。試著清除搜尋字或放寬篩選。</li>';
     if (res.length > listLimit) html += '<li><button type="button" class="more-btn">再顯示 ' + Math.min(300, res.length - listLimit) + ' 個（共 ' + res.length + ' 個）</button></li>';
@@ -675,6 +726,19 @@
     });
     return lines.join('\n');
   }
+
+  // 點規則文字裡的 #標籤：清掉其他篩選，只列出該標籤的能力
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-tag]');
+    if (!t) return;
+    e.preventDefault();
+    F = Object.assign({}, F_DEFAULT, { tag: t.getAttribute('data-tag'), sort: F.sort });
+    store('dex-filters', F);
+    listLimit = 150;
+    if (catalogBuilt) syncControls();
+    if (location.hash === '#abilities') { renderList(); window.scrollTo(0, 0); }
+    else location.hash = 'abilities';
+  });
 
   // ------------------------------------------------------------------ 路由
   var built = {};
