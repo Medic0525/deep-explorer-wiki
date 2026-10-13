@@ -1,0 +1,342 @@
+<title>深淵的探索者 維基</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&display=swap">
+<style>
+/*STYLE*/
+</style>
+<!--BODY-->
+<div class="shell">
+  <header class="rail">
+    <a class="brand" href="#home">
+      <span class="brand-title">深淵的探索者</span>
+      <span class="brand-sub">Deep Explorer · Ver 4.0</span>
+      <span class="brand-depth" aria-hidden="true"></span>
+    </a>
+    <nav class="nav" aria-label="主選單">
+      <a href="#home" data-nav="home">總覽</a>
+      <a href="#create" data-nav="create">角色創造</a>
+      <a href="#rules" data-nav="rules">規則</a>
+      <div class="nav-label">購點</div>
+      <a href="#abilities" data-nav="abilities">能力目錄 <span class="count" data-stat="all"></span></a>
+      <a href="#specialists" data-nav="specialists">精通能力 <span class="count" data-stat="spec"></span></a>
+      <a href="#planner" data-nav="planner">購點規劃</a>
+      <div class="nav-label">勢力</div>
+      <a href="#factions" data-nav="factions">四大勢力</a>
+      <a class="sub" href="#f-sanctum" data-nav="f-sanctum">天理聖堂</a>
+      <a class="sub" href="#f-iron" data-nav="f-iron">帝國鐵刃軍</a>
+      <a class="sub" href="#f-arcane" data-nav="f-arcane">奧秘之理</a>
+      <a class="sub" href="#f-shadow" data-nav="f-shadow">暗影黑翼</a>
+    </nav>
+    <div class="rail-foot">
+      <span class="src">資料來源：深淵的探索者 Ver.4.0 與四大勢力手冊</span>
+      <button class="theme-btn" id="theme-btn" type="button">切換深淺色</button>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- ============ 總覽 ============ -->
+    <div class="page" data-page="home">
+      <div class="page-head">
+        <span class="eyebrow">D&amp;D 5E 改版規則 · 無職業、無等級</span>
+        <h1>深淵的探索者</h1>
+        <p class="lede">移除職業與等級，所有成長都用 Deep Point（DP）購買。玩家是「靈魂」，角色是「肉體」；能力分成通用、武力、靈敏、魔法、特殊五個分支，自由組合出想要的角色。規則書沒寫到的專長、法術與子職細節，一律依原版規則書。</p>
+      </div>
+
+      <div class="tiles">
+        <div class="tile accent"><span class="k">起始 DP</span><span class="v">10,000</span></div>
+        <div class="tile"><span class="k">可購買能力</span><span class="v"><span data-stat="all"></span><small> 個</small></span></div>
+        <div class="tile"><span class="k">創角能力上限</span><span class="v">20<small> 個</small></span></div>
+        <div class="tile"><span class="k">精通能力</span><span class="v"><span data-stat="spec"></span><small> 種</small></span></div>
+      </div>
+
+      <div class="notice" id="missing-notice">
+        <strong>特殊類能力尚未收錄</strong>
+        <p>主規則書的「特殊類能力」章節目前沒有匯入。其他能力的先決條件引用到的 <span data-stat="stubs"></span> 個特殊能力（例如「氣」「神力引導」）以<span class="chip stub">待補</span>標示，可以看到哪些能力需要它們，但沒有內容與價格。四大勢力的特殊能力已完整收錄。</p>
+      </div>
+
+      <section class="block">
+        <h2>創角流程</h2>
+        <ol class="steps">
+          <li><div><strong>以購點制配置屬性值。</strong> 種族一律為中型或小型類人生物（中型移動 30 尺、小型 20 尺），外貌、性別、背景與陣營自由決定。</div></li>
+          <li><div><strong>選擇一個起源。</strong> 士兵、學者、貴族、浪人、奧秘、先知、特質，各自給予屬性加值與特性。<a href="#create">看起源</a></div></li>
+          <li><div><strong>選擇一個精通能力。</strong> 之後每累積 10 個能力再獲得一個。<a href="#specialists">看精通能力</a></div></li>
+          <li><div><strong>用 10,000 DP 購買能力。</strong> 最多 20 個，同名能力只能買一次（除非註明可重複購買）。<a href="#abilities">看能力目錄</a></div></li>
+          <li><div><strong>補完熟練。</strong> 二個技能熟練或一個技能專精、一個工具組、一個樂器與一個遊戲套組；具簡易武器熟練與施法能力，3 個法術容量，會說讀寫通用語與另一種語言。</div></li>
+          <li><div><strong>選擇勢力（可不選）。</strong> 每人只能有一個勢力，創角時入會免費。<a href="#factions">看四大勢力</a></div></li>
+        </ol>
+        <p><a class="btn" href="#planner">開啟購點規劃</a></p>
+      </section>
+
+      <section class="block">
+        <h2>能力分支與成長</h2>
+        <p class="prose">每購買一個能力，依分支提高最大生命值與魔力。起始生命值為 10＋體質調整值；生命骰為 d10，數量等於能力數。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>分支</th><th class="num">能力數</th><th>最大生命值成長</th><th class="num">魔力成長</th></tr></thead>
+            <tbody id="branch-table"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="block">
+        <h2>熟練加值</h2>
+        <p class="prose">熟練加值依購買的能力總數提升。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>能力總數</th><th class="num">1–4</th><th class="num">5–8</th><th class="num">9–12</th><th class="num">13–16</th><th class="num">17+</th></tr></thead>
+            <tbody><tr><td>熟練加值</td><td class="num">+2</td><td class="num">+3</td><td class="num">+4</td><td class="num">+5</td><td class="num">+6</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="block">
+        <h2>整理備註</h2>
+        <p class="prose">整理時發現的原文疑似筆誤，維基保留原文，只在這裡註記，請 GM 裁定：</p>
+        <ul class="prose">
+          <li>【靈敏】偷襲Ⅵ（4000DP）應為偷襲Ⅳ；偷襲Ⅴ 的先決條件寫成「偷襲Ⅴ」自己，維基視為需要前一階（偷襲Ⅵ）。</li>
+          <li>【通用】感知／智力／魅力成長的說明寫「體質屬性最高 20」，應為各自屬性最高 20。</li>
+          <li>【武力】劍刃滾滾 的先決條件寫「靈動步伐」，維基連到【靈敏】靈動步法；巖龍途 寫「堅岩之鎧」，連到【武力】堅岩鎧。</li>
+          <li>【武力】火炬聚集、【靈敏】陷阱雲海 的價格原文沒有 DP 單位，維基照數字當作 DP。</li>
+          <li>天理聖堂與帝國鐵刃軍的驅除條件寫「被奧秘之理裁定」，應為各自勢力裁定。</li>
+        </ul>
+      </section>
+    </div>
+
+    <!-- ============ 角色創造 ============ -->
+    <div class="page" data-page="create" hidden>
+      <div class="page-head">
+        <span class="eyebrow">角色創造</span>
+        <h1>肉體與靈魂</h1>
+        <p class="lede">玩家是靈魂，角色是肉體。靈魂擁有 DP 與倉庫，肉體死亡後可以在神殿重塑。</p>
+      </div>
+
+      <section class="block">
+        <h2>靈魂的初始資源</h2>
+        <p class="prose">每個靈魂在初始時獲得 10,000 DP 與以下物品，儲存在神殿的靈魂池與倉庫中。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>類別</th><th>物品</th></tr></thead>
+            <tbody>
+              <tr><td>武器與防具</td><td>合計 4 個軍用武器、合計 6 個簡易武器、合計 10 組投擲武器、1 個盾牌、1 件皮甲、1 件鱗甲</td></tr>
+              <tr><td>彈藥</td><td>3 組箭矢（每組 10 支）、3 組弩矢（每組 10 支）、2 個箭袋</td></tr>
+              <tr><td>施法</td><td>合計 2 個奧術法器、1 個材料包、1 個聖徽、2 瓶聖水</td></tr>
+              <tr><td>冒險裝備</td><td>4 個背包、2 個睡袋、2 套野炊工具組、2 個打火匣、10 支火炬、20 天份乾糧、2 個水袋、2 條 50 尺麻繩、3 條 10 尺弦線、3 個鈴鐺、20 支蠟燭、10 個岩釘、2 個木桶、1 盞附蓋提燈、2 瓶燈油</td></tr>
+              <tr><td>文書</td><td>2 瓶墨水、2 支墨水筆、20 張羊皮紙、2 本空白筆記本</td></tr>
+              <tr><td>消耗品與特殊</td><td>5 瓶治療藥水、1 個傳送門碎片、1 個贖罪石、3 個工藝石（常見）</td></tr>
+              <tr><td>自選</td><td>1 個工具組、1 個樂器、1 個遊戲套組</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="block">
+        <h2>肉體的基本原則</h2>
+        <ul class="prose">
+          <li>均為中型或小型的類人生物，外貌、性別、背景與陣營由玩家自由決定。中型移動速度 30 尺，小型 20 尺。</li>
+          <li>以購點制配置屬性值。</li>
+          <li>選擇一個精通能力，以及以下一個起源。</li>
+          <li>角色可以購買 20 個能力，同名能力只能購買一次（除非有特別說明）。</li>
+          <li>可以選擇二個技能熟練或一個技能專精；選擇一個工具組熟練；選擇一個樂器熟練和一個遊戲套組熟練。</li>
+          <li>具有簡易武器熟練及施法能力，擁有 3 個法術容量。</li>
+          <li>會說、讀、寫通用語和另一種自選語言。</li>
+          <li>選擇一個勢力加入（可不選）。</li>
+        </ul>
+      </section>
+
+      <section class="block">
+        <h2>起源</h2>
+        <div class="cards" id="origin-cards"></div>
+      </section>
+    </div>
+
+    <!-- ============ 規則 ============ -->
+    <div class="page" data-page="rules" hidden>
+      <div class="page-head">
+        <span class="eyebrow">特殊規則</span>
+        <h1>世界規則</h1>
+        <p class="lede">本模組覆寫或新增的規則。沒有提到的部分依照玩家手冊。</p>
+        <div class="seg" id="rules-toc"></div>
+      </div>
+
+      <section class="block" id="r-soul">
+        <h2>靈魂池、倉庫與死亡</h2>
+        <dl class="kv">
+          <dt>靈魂池</dt><dd>每個靈魂有自己的靈魂池，角色可將身上的 DP 存入。同一個靈魂下的角色可以自由提取。</dd>
+          <dt>倉庫</dt><dd>共 50 格，除裝備（投擲類武器除外）外，每格可存放 100 個同名物品。同一個靈魂下的角色可以自由提取。</dd>
+          <dt>死亡回歸</dt><dd>角色死亡時，肉體上所有 DP 全部消失，身上的物品留在原地，靈魂回歸神殿重塑肉體。</dd>
+          <dt>重塑肉體</dt><dd>需要「此角色的能力數 × 500」DP，從靈魂池扣除。靈魂池不足時，此角色將會消失。</dd>
+          <dt>致命一擊</dt><dd>角色生命值為 0 時，敵對生物可以在 5 尺內以一個主要動作發動 Fatal Blow，角色直接死亡。</dd>
+        </dl>
+      </section>
+
+      <section class="block" id="r-crit">
+        <h2>大成功效應</h2>
+        <h3>技能大成功</h3>
+        <p class="prose">技能判定大成功時，選擇下面一種效果：</p>
+        <ul class="prose">
+          <li>將這次的大成功變為成功，下次擲骰失敗時將其變為成功（不可用於戰鬥中的命中判定）。</li>
+          <li>將這次的大成功變為成功，與你一同判定的友方生物如失敗將會變為成功。</li>
+          <li>將這次的大成功變為成功，下次擲骰大失敗時可以再骰一次。</li>
+          <li>保持大成功不變。</li>
+        </ul>
+        <h3>命中大成功</h3>
+        <p class="prose">攻擊命中大成功時，依傷害類型可額外獲得效果（複數傷害類型時選一種，玩家可自行決定是否使用）：</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>傷害類型</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td>鈍擊</td><td>目標獲得 [昏迷]，持續到其受到傷害或其回合結束。</td></tr>
+              <tr><td>穿刺</td><td>目標獲得 [重傷]。</td></tr>
+              <tr><td>揮砍</td><td>攻擊者額外獲得一次攻擊的機會。</td></tr>
+              <tr><td>酸蝕</td><td>目標獲得 [腐蝕]。</td></tr>
+              <tr><td>冰冷</td><td>目標獲得 [束縛]，持續到其回合結束。</td></tr>
+              <tr><td>火焰</td><td>目標進入 [燃燒]，且方圓 5 尺受到此次火焰傷害 1/2 的火焰傷害。</td></tr>
+              <tr><td>閃電</td><td>目標獲得 [麻痺]，持續到其受到傷害或其回合結束。</td></tr>
+              <tr><td>雷鳴</td><td>目標獲得 [震懾]，持續到其受到傷害或其回合結束。</td></tr>
+              <tr><td>毒素</td><td>目標獲得 [中毒]。</td></tr>
+              <tr><td>闇蝕</td><td>目標獲得 [無力]，持續到其受到傷害或其回合結束。</td></tr>
+              <tr><td>光耀</td><td>目標獲得 [目盲] 與 [繳械]。</td></tr>
+              <tr><td>心靈</td><td>目標獲得 [恐懼]，持續到其回合結束。</td></tr>
+              <tr><td>力場</td><td>目標獲得 [伏地]。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="block" id="r-rest">
+        <h2>休憩點與旅行</h2>
+        <p class="prose">長休時獲得 6 點休憩點，可用來製作物品、採集、探查。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>行為</th><th class="num">休憩點</th><th>說明</th></tr></thead>
+            <tbody>
+              <tr><td>製作物品</td><td class="num">3</td><td>製作、修理、分解物品（藥物、料理、裝備…），或在營地周圍製作防護。</td></tr>
+              <tr><td>採集礦物</td><td class="num">4</td><td>採集一個隨機礦物採集物。具探索工具組熟練時可骰兩次，選一個想要的結果。</td></tr>
+              <tr><td>採集植物</td><td class="num">2</td><td>採集一個指定植物。</td></tr>
+              <tr><td>探查</td><td class="num">4</td><td>限密探工具組熟練。獲得周圍 60 哩內的地形與大致的生物分布，以便規劃旅行。</td></tr>
+              <tr><td>狩獵</td><td class="num">6</td><td>限探索工具組熟練。獲得 5 份隨機肉類與 10 份隨機植物。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>旅行步調</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>步調</th><th class="num">每小時</th><th class="num">每日</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td>快速</td><td class="num">4 哩</td><td class="num">30 哩</td><td>被動睿知（感知）−5</td></tr>
+              <tr><td>正常</td><td class="num">3 哩</td><td class="num">24 哩</td><td>—</td></tr>
+              <tr><td>緩慢</td><td class="num">2 哩</td><td class="num">18 哩</td><td>可以使用隱匿</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="prose"><strong>強行軍：</strong>表中數據假定一天行進 8 小時。超過 8 小時後，每多旅行一小時可再前進一小時的距離，且每兩小時結束時每個角色進行一次體質豁免，DC＝10＋（8 小時後的旅行時數），失敗則力竭等級 +1。</p>
+        <p class="prose"><strong>遭遇：</strong>玩家在地圖上遇到其他單位時觸發遭遇，可以與遭遇單位發生友好或敵對的行為。</p>
+      </section>
+
+      <section class="block" id="r-portal">
+        <h2>傳送門 Portal</h2>
+        <p class="prose">在這個世界中，大距離傳送法術極其不穩定，只能藉由前人留下的傳送門進行大距離傳送。</p>
+        <dl class="kv">
+          <dt>連接</dt><dd>花費 1 魔力與至少一個短休的時間與傳送門建立靈魂連接。成功後，此靈魂之下的角色都能藉由這個傳送門傳送。</dd>
+          <dt>建造</dt><dd>一名以上的角色消耗總和 20 個傳送門碎片、總計 40 魔力與至少一個長休，在 10×10×10 尺的空間中建造。參與建造的角色自動與其連接。</dd>
+          <dt>守則</dt><dd>傳送門是這個世界中非常珍貴的物體，一般而言具有智慧的生物不會去破壞它。</dd>
+        </dl>
+      </section>
+
+      <section class="block" id="r-lang">
+        <h2>語言、文字與工具組</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>語言</th><th>主要使用族群</th><th>文字</th></tr></thead>
+            <tbody>
+              <tr><td>通用語</td><td>人類</td><td>通用文</td></tr>
+              <tr><td>巨人語</td><td>巨人、食人魔</td><td>矮人文</td></tr>
+              <tr><td>矮人語</td><td>矮人、地侏</td><td>矮人文</td></tr>
+              <tr><td>獸人語</td><td>獸人、哥布林</td><td>通用文</td></tr>
+              <tr><td>妖精語</td><td>妖精、精靈</td><td>妖精文</td></tr>
+              <tr><td>龍語</td><td>龍、龍裔、蜥蜴人</td><td>龍文</td></tr>
+              <tr><td>原初語</td><td>元素生物、精類生物</td><td>乙太文</td></tr>
+              <tr><td>天界語</td><td>天界生物</td><td>天界文</td></tr>
+              <tr><td>深淵語</td><td>惡魔、魔鬼</td><td>深淵文</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="prose">工具組縮減為五種：工匠工具組、密探工具組、探索工具組、製藥工具組、廚師工具組。</p>
+      </section>
+
+      <section class="block" id="r-gear">
+        <h2>裝備欄與詞綴</h2>
+        <p class="prose">裝備欄共 8 格：左手武器、右手武器、頭部、護甲、手部、足部、裝飾品 ×2。</p>
+        <p class="prose">裝備具有主詞綴與副詞綴，需要該裝備的熟練才能使用詞綴能力。主詞綴無法變更或拆除；副詞綴可用對應等級的工藝石與工匠工具組變更。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>裝備</th><th class="num">詞綴上限</th></tr></thead>
+            <tbody>
+              <tr><td>雙手武器</td><td class="num">6</td></tr>
+              <tr><td>單手武器（盾牌）</td><td class="num">4</td></tr>
+              <tr><td>護甲</td><td class="num">4</td></tr>
+              <tr><td>頭部、手部、足部</td><td class="num">3</td></tr>
+              <tr><td>裝飾品</td><td class="num">2</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="prose"><strong>同調：</strong>同一時間最多與 3 件裝備同調，且不能同時與多於一件相同的裝備同調（例如不能同時戴兩枚防護戒指）。</p>
+      </section>
+
+      <section class="block" id="r-stats">
+        <h2>屬性、生命值與魔力</h2>
+        <ul class="prose">
+          <li>起始生命值：10＋體質調整值。每購買一個能力，依分支增加最大生命值與魔力（見<a href="#home">總覽</a>的分支表）。</li>
+          <li>力量、敏捷、體質：依照原版。</li>
+          <li>智力／感知／魅力：每一點調整值使魔力 +1；三者不疊加，以最高項為準。施法調整值也使用最高項。</li>
+          <li>生命骰為 d10，數目等於能力數。</li>
+          <li>熟練加值：能力總數 1／5／9／13／17 時分別為 +2／+3／+4／+5／+6。</li>
+        </ul>
+      </section>
+
+      <section class="block" id="r-spell">
+        <h2>法術與魔力</h2>
+        <p class="prose">每名初始角色有 3 個法術容量，每個容量可以存放一個法術（含戲法），不論環階。施法消耗魔力（MP），每次長休結束時回復全部魔力。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>法術環階</th><th class="num">戲法</th><th class="num">1</th><th class="num">2</th><th class="num">3</th><th class="num">4</th><th class="num">5</th><th class="num">6</th><th class="num">7</th><th class="num">8</th><th class="num">9</th></tr></thead>
+            <tbody>
+              <tr><td>施放耗費魔力</td><td class="num">—</td><td class="num">1</td><td class="num">2</td><td class="num">3</td><td class="num">4</td><td class="num">5</td><td class="num">6</td><td class="num">7</td><td class="num">8</td><td class="num">9</td></tr>
+              <tr><td>學習耗費 DP</td><td class="num">100</td><td class="num">500</td><td class="num">500</td><td class="num">1000</td><td class="num">1000</td><td class="num">2000</td><td class="num">2000</td><td class="num">3000</td><td class="num">3000</td><td class="num">5000</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="prose"><strong>學習法術：</strong>從魔法書或法術卷軸把法術加入法術容量，需要一次長休與上表的 DP；不論加入多少個法術都只花一次長休。魔法書不會被消耗，法術卷軸會被消耗。</p>
+        <h3>本模組禁用的法術</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="num">環階</th><th>法術</th></tr></thead>
+            <tbody>
+              <tr><td class="num">3</td><td>李歐蒙小屋 Leomund's Tiny Hut、創造飲食 Create Food and Water</td></tr>
+              <tr><td class="num">4</td><td>李歐蒙秘藏箱 Leomund's Secret Chest、魔鄧肯私人密室 Mordenkainen's Private Sanctum</td></tr>
+              <tr><td class="num">5</td><td>傳送法陣 Teleportation Circle、轉生術 Reincarnate</td></tr>
+              <tr><td class="num">6</td><td>銅牆鐵壁 Guards and Wards、回返真言 Word of Recall、御風而行 Wind Walk、植物遁走術 Transport via Plants、異界盟友 Planar Ally、魔魂壺 Magic Jar</td></tr>
+              <tr><td class="num">7</td><td>傳送術 Teleport、異界傳送 Plane Shift、諸神殿堂 Temple of the Gods、魔鄧肯豪宅術 Mordenkainen's Magnificent Mansion</td></tr>
+              <tr><td class="num">8</td><td>克隆術 Clone、創造半位面 Demiplane、宏偉堡壘 Mighty Fortress</td></tr>
+              <tr><td class="num">9</td><td>星界投影 Astral Projection、異界之門 Gate、祈願術 Wish</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- ============ 動態頁面 ============ -->
+    <div class="page wide" data-page="abilities" hidden></div>
+    <div class="page" data-page="specialists" hidden></div>
+    <div class="page" data-page="factions" hidden></div>
+    <div class="page" data-page="faction" hidden></div>
+    <div class="page wide" data-page="planner" hidden></div>
+  </main>
+</div>
+<script>
+/*DATA*/
+</script>
+<script>
+/*APP*/
+</script>
