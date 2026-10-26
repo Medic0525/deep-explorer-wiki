@@ -221,6 +221,8 @@ td.num, th.num { text-align: right; }
 .rules-text ul ul { margin-top: 4px; }
 .rules-text li.opt { list-style: none; margin-left: -1.3em; font-weight: 700; margin-top: 6px; }
 .rules-text li.opt > ul { font-weight: 400; }
+.rules-text li.bare { list-style: none; }
+.rules-text ul ul ul ul { list-style: circle; }
 .rules-text li.opt::before { content: "◆ "; color: var(--accent); font-size: .8em; }
 
 /* ---------- ability catalog ---------- */

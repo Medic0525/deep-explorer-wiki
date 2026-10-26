@@ -15,9 +15,10 @@
 ## 資料來源
 
 `tools/source/core-rulebook.txt` 的前半（到【魔法】千面相）來自 C 版的 Google Drive 文字匯出，並套用 D 版的變更；
-之後的魔法類與特殊類能力由 D 版 PDF 以 `pdftotext` 抽出，再用 `tools/merge_pdf_text.py` 整理接上。
+之後的魔法類與特殊類能力由 `tools/merge_pdf_text.py` 從 D 版 PDF 抽出（`pdftotext -layout -fixed 5`，
+依版面縮排還原清單層級與段落）後接上。版面自動還原仍不正確的少數能力，在 `tools/source/layout-fixes.txt`
+依 PDF 原頁手動整理，建置時取代該能力的本文。
 能力 ID 由名稱產生（`a` + 8 位雜湊），改版時連結與購點規劃存檔不會錯位；`data/legacy-ids.js` 用來轉換 C 版的舊編號。
-PDF 抽字偶爾會讓清單項目的順序或縮排錯位，發現時直接修改來源文字後重新建置即可。
 
 ## 使用
 
@@ -27,7 +28,7 @@ PDF 抽字偶爾會讓清單項目的順序或縮排錯位，發現時直接修�
 ## 建置
 
 ```sh
-python3 tools/merge_pdf_text.py p1.txt p2.txt  # （僅在重新匯入 PDF 時）接上 PDF 文字
+python3 tools/merge_pdf_text.py 規則書-1.pdf 規則書-2.pdf  # （僅在匯入新版 PDF 時）接上 PDF 文字
 python3 tools/build_data.py   # tools/source/core-rulebook.txt → data/core.js
 python3 tools/build_site.py   # src/ + data/ + assets/ → index.html
 ```
@@ -35,6 +36,7 @@ python3 tools/build_site.py   # src/ + data/ + assets/ → index.html
 | 路徑 | 說明 |
 | --- | --- |
 | `tools/source/core-rulebook.txt` | 主規則書文字（由 PDF 匯出） |
+| `tools/source/layout-fixes.txt` | 手動排版修正（表格、原書縮排不一致處） |
 | `data/core.js` | 自動產生的能力與精通能力資料 |
 | `data/factions.js` | 四大勢力資料（手動整理自勢力 PDF） |
 | `src/` | 頁面樣板、樣式與程式 |

@@ -173,15 +173,33 @@
     s = s.replace(/『([^』]+)』/g, '<span class="spell">『$1』</span>');
     return s;
   }
+  // 清單層級：◆ 選項標題、◇ 選項內容、• ◦ ▪ ‣ 第一到四層；「¶N 」是第 N 層裡不加符號的段落
   function lineLevel(line) {
-    var m = /^(◆|◇|•|◦|○|▪)\s*/.exec(line);
+    var b = /^¶([1-4])\s*/.exec(line);
+    if (b) return { lvl: +b[1], cls: 'bare', text: line.slice(b[0].length) };
+    var m = /^(◆|◇|•|◦|○|▪|‣)\s*/.exec(line);
     if (!m) return { lvl: 0, text: line };
-    var map = { '◆': [1, 'opt'], '◇': [2, ''], '•': [1, ''], '◦': [2, ''], '○': [2, ''], '▪': [3, ''] };
+    var map = { '◆': [1, 'opt'], '◇': [2, ''], '•': [1, ''], '◦': [2, ''], '○': [2, ''], '▪': [3, ''], '‣': [4, ''] };
     return { lvl: map[m[1]][0], cls: map[m[1]][1], text: line.slice(m[0].length) };
   }
   function renderBody(lines) {
-    var out = [], depth = 0;
+    var out = [], depth = 0, table = null;
+    function closeTable() {
+      if (!table) return;
+      out.push('<div class="table-wrap"><table><thead><tr>' + table[0].map(function (c) { return '<th>' + fmt(c) + '</th>'; }).join('') +
+        '</tr></thead><tbody>' + table.slice(1).map(function (r) {
+          return '<tr>' + r.map(function (c) { return '<td>' + fmt(c) + '</td>'; }).join('') + '</tr>';
+        }).join('') + '</tbody></table></div>');
+      table = null;
+    }
     lines.forEach(function (raw) {
+      // 表格列：「｜欄｜欄」
+      if (raw.charAt(0) === '｜') {
+        while (depth > 0) { out.push('</li></ul>'); depth--; }
+        (table = table || []).push(raw.slice(1).split('｜').map(function (c) { return c.trim(); }));
+        return;
+      }
+      closeTable();
       var p = lineLevel(raw);
       if (!p.lvl) {
         while (depth > 0) { out.push('</li></ul>'); depth--; }
@@ -199,6 +217,7 @@
       }
       out.push('<li' + (p.cls ? ' class="' + p.cls + '"' : '') + '>' + fmt(p.text));
     });
+    closeTable();
     while (depth > 0) { out.push('</li></ul>'); depth--; }
     return '<div class="rules-text">' + out.join('') + '</div>';
   }
