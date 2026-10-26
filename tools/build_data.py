@@ -14,6 +14,7 @@ import unicodedata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+FIXES = ROOT / 'tools/source/layout-fixes.txt'
 SRC = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / 'tools/source/core-rulebook.txt'
 OUT = Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / 'data/core.js'
 
@@ -28,8 +29,6 @@ REF_ALIASES = {
     '光明之劍': '神力引導﹝光明之劍﹞',
     '圖騰精魂': '精魂圖騰',
     '聖甲蟲使徒': '聖甲蟲聖徒',
-    '動物夥伴原初野獸': '動物夥伴-原初野獸',
-    '動物夥伴龍獸看守': '動物夥伴-龍獸看守',
 }
 
 
@@ -187,6 +186,29 @@ def parse_prereq(text, own_name):
     return groups, excl, soft, extra
 
 
+def stable_id(name):
+    """由能力名稱產生的固定 ID，規則書改版、能力增減時連結與存檔不會錯位。"""
+    h = 0x811C9DC5
+    for byte in name.encode('utf-8'):
+        h = ((h ^ byte) * 0x01000193) & 0xFFFFFFFF
+    return 'a' + format(h, '08x')
+
+
+def load_fixes():
+    """讀取手動排版修正：以「【分類】名稱」一行開頭，接著是該能力的完整本文，取代 PDF 抽出的本文。"""
+    fixes, cur = {}, None
+    if not FIXES.exists():
+        return fixes
+    for line in fix_chars(FIXES.read_text(encoding='utf-8')).split('\n'):
+        m = re.match(r'^【(通用|武力|靈敏|魔法|特殊)】(\S.*)$', line.strip())
+        if m and '(' not in line:
+            cur = fixes.setdefault(norm(m.group(2)), [])
+        elif cur is not None and not line.startswith('#'):
+            cur.append(line)
+    return {k: '\n'.join(v).strip('\n') for k, v in fixes.items()}
+
+
+FIX_BODIES = load_fixes()
 hits = []
 for m in HDR.finditer(body_src):
     groups, end = take_groups(body_src, m.end())
@@ -197,7 +219,7 @@ for idx, (m, groups, end) in enumerate(hits):
     nxt = hits[idx + 1][0].start() if idx + 1 < len(hits) else len(body_src)
     branch = '靈敏' if m.group(1) == '敏捷' else m.group(1)
     name = norm(m.group(2))
-    a = {'id': f'm{idx + 1:03d}', 'b': branch, 'n': name, 'c': int(m.group(3))}
+    a = {'id': stable_id(name), 'b': branch, 'n': name, 'c': int(m.group(3))}
     for g in groups:
         g = tidy(g)
         if '重複購買' in g:
@@ -214,7 +236,7 @@ for idx, (m, groups, end) in enumerate(hits):
                 a['soft'] = 1
             if extra:
                 a['extra'] = 1
-    a['t'] = clean_body(body_src[end:nxt])
+    a['t'] = clean_body(FIX_BODIES.pop(name) if name in FIX_BODIES else body_src[end:nxt])
     abilities.append(a)
 
 # ---------------------------------------------------------------- 精通能力
@@ -248,6 +270,9 @@ for s in specialists:
     s['t'] = [tidy(l) for l in s['t'] if l != '(兩個不會變 1/4。)']
 assert not names, f'找不到精通能力: {names}'
 
+assert not FIX_BODIES, f'排版修正找不到對應能力: {list(FIX_BODIES)}'
+ids = [a['id'] for a in abilities]
+assert len(ids) == len(set(ids)), '能力 ID 重複'
 data = {'abilities': abilities, 'specialists': specialists}
 OUT.parent.mkdir(parents=True, exist_ok=True)
 OUT.write_text('/* 由 tools/build_data.py 自動產生，請勿手動編輯 */\nwindow.CORE = '

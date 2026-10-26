@@ -1,22 +1,24 @@
 # 深淵的探索者 維基
 
-《深淵的探索者 Ver.4.0》（D&D 5E 改版、無職業無等級、以 DP 購點）的網頁維基。
+《深淵的探索者 Ver.4.0_D》（D&D 5E 改版、無職業無等級、以 DP 購點）的網頁維基。
 
 ## 內容
 
 - **總覽**：創角流程、能力分支的生命值／魔力成長、熟練加值表、整理備註（原文疑似筆誤）
 - **角色創造**：靈魂初始資源、肉體原則、七種起源
 - **規則**：靈魂池與死亡、大成功效應、休憩點與旅行、傳送門、語言、裝備詞綴、法術與魔力、禁用法術
-- **能力目錄**：主規則書 1055 個能力（通用 159、武力 176、靈敏 97、魔法 217、特殊 406）＋四大勢力 40 個專屬能力，可搜尋、依分支／價格／來源篩選；每個能力顯示先決條件與「以此為前置的後續能力」
+- **能力目錄**：主規則書 1053 個能力（通用 157、武力 176、靈敏 97、魔法 217、特殊 406）＋四大勢力 40 個專屬能力，可搜尋、依分支／價格／來源篩選；每個能力顯示先決條件與「以此為前置的後續能力」
 - **精通能力**：43 種 Specialist
 - **四大勢力**：天理聖堂、帝國鐵刃軍、奧秘之理、暗影黑翼（關係、加入條件、特性、專屬能力、商店、法術改造）
 - **購點規劃**：27 點購點屬性計算機（含起源、X成長、屬性值增加、極限突破）、依能力數開放的精通能力選擇、能力購買；即時計算剩餘 DP、熟練加值、生命值、魔力，並檢查先決條件與勢力限制，可複製角色摘要
 
 ## 資料來源
 
-`tools/source/core-rulebook.txt` 的前半（到【魔法】千面相）來自 Google Drive 的文字匯出，
-之後的魔法類與特殊類能力由 PDF 以 `pdftotext` 抽出，再用 `tools/merge_pdf_text.py` 整理接上。
-PDF 抽字偶爾會讓清單項目的順序或縮排錯位，發現時直接修改來源文字後重新建置即可。
+`tools/source/core-rulebook.txt` 的前半（到【魔法】千面相）來自 C 版的 Google Drive 文字匯出，並套用 D 版的變更；
+之後的魔法類與特殊類能力由 `tools/merge_pdf_text.py` 從 D 版 PDF 抽出（`pdftotext -layout -fixed 5`，
+依版面縮排還原清單層級與段落）後接上。版面自動還原仍不正確的少數能力，在 `tools/source/layout-fixes.txt`
+依 PDF 原頁手動整理，建置時取代該能力的本文。
+能力 ID 由名稱產生（`a` + 8 位雜湊），改版時連結與購點規劃存檔不會錯位；`data/legacy-ids.js` 用來轉換 C 版的舊編號。
 
 ## 使用
 
@@ -26,7 +28,7 @@ PDF 抽字偶爾會讓清單項目的順序或縮排錯位，發現時直接修�
 ## 建置
 
 ```sh
-python3 tools/merge_pdf_text.py p1.txt p2.txt  # （僅在重新匯入 PDF 時）接上 PDF 文字
+python3 tools/merge_pdf_text.py 規則書-1.pdf 規則書-2.pdf  # （僅在匯入新版 PDF 時）接上 PDF 文字
 python3 tools/build_data.py   # tools/source/core-rulebook.txt → data/core.js
 python3 tools/build_site.py   # src/ + data/ + assets/ → index.html
 ```
@@ -34,6 +36,7 @@ python3 tools/build_site.py   # src/ + data/ + assets/ → index.html
 | 路徑 | 說明 |
 | --- | --- |
 | `tools/source/core-rulebook.txt` | 主規則書文字（由 PDF 匯出） |
+| `tools/source/layout-fixes.txt` | 手動排版修正（表格、原書縮排不一致處） |
 | `data/core.js` | 自動產生的能力與精通能力資料 |
 | `data/factions.js` | 四大勢力資料（手動整理自勢力 PDF） |
 | `src/` | 頁面樣板、樣式與程式 |
