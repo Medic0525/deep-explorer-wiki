@@ -24,7 +24,7 @@ def build():
         b64 = base64.b64encode(f.read_bytes()).decode()
         emblems.append(f'  --emblem-{f.stem}: url("data:image/png;base64,{b64}");')
     css += '\n:root {\n' + '\n'.join(emblems) + '\n}\n'
-    data = read('data/core.js') + '\n' + read('data/factions.js')
+    data = read('data/core.js') + '\n' + read('data/factions.js') + '\n' + read('data/legacy-ids.js')
     app = read('src/app.js')
     for name, chunk in (('data', data), ('app', app)):
         if '</script' in chunk.lower():

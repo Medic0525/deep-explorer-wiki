@@ -187,6 +187,14 @@ def parse_prereq(text, own_name):
     return groups, excl, soft, extra
 
 
+def stable_id(name):
+    """由能力名稱產生的固定 ID，規則書改版、能力增減時連結與存檔不會錯位。"""
+    h = 0x811C9DC5
+    for byte in name.encode('utf-8'):
+        h = ((h ^ byte) * 0x01000193) & 0xFFFFFFFF
+    return 'a' + format(h, '08x')
+
+
 hits = []
 for m in HDR.finditer(body_src):
     groups, end = take_groups(body_src, m.end())
@@ -197,7 +205,7 @@ for idx, (m, groups, end) in enumerate(hits):
     nxt = hits[idx + 1][0].start() if idx + 1 < len(hits) else len(body_src)
     branch = '靈敏' if m.group(1) == '敏捷' else m.group(1)
     name = norm(m.group(2))
-    a = {'id': f'm{idx + 1:03d}', 'b': branch, 'n': name, 'c': int(m.group(3))}
+    a = {'id': stable_id(name), 'b': branch, 'n': name, 'c': int(m.group(3))}
     for g in groups:
         g = tidy(g)
         if '重複購買' in g:
@@ -248,6 +256,8 @@ for s in specialists:
     s['t'] = [tidy(l) for l in s['t'] if l != '(兩個不會變 1/4。)']
 assert not names, f'找不到精通能力: {names}'
 
+ids = [a['id'] for a in abilities]
+assert len(ids) == len(set(ids)), '能力 ID 重複'
 data = {'abilities': abilities, 'specialists': specialists}
 OUT.parent.mkdir(parents=True, exist_ok=True)
 OUT.write_text('/* 由 tools/build_data.py 自動產生，請勿手動編輯 */\nwindow.CORE = '

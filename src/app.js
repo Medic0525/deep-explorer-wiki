@@ -244,9 +244,18 @@
   var plan = Object.assign({ start: START_DP, origin: '', faction: '', budget: 27, picks: [], specs: [] }, saved);
   plan.base = Object.assign(fill(PB_MIN), saved.base || {});
   plan.free = Object.assign(fill(0), saved.free || {});
+  // 舊版(C)存檔用的是連續編號 ID，轉成固定 ID；D 版移除的能力記下來提示使用者
+  var LEGACY = window.LEGACY_IDS || {}, LEGACY_GONE = window.LEGACY_REMOVED || {}, droppedPicks = [];
+  (plan.picks || []).forEach(function (p) {
+    if (/^m\d{3}$/.test(p.id)) {
+      if (LEGACY_GONE[p.id]) droppedPicks.push(LEGACY_GONE[p.id]);
+      p.id = LEGACY[p.id] || p.id;
+    }
+  });
   plan.picks = (plan.picks || []).filter(function (p) { return BY_ID[p.id]; });
   plan.specs = (plan.specs || []).filter(function (s) { return SPEC_BY[s.n]; });
   function savePlan() { store('dex-plan', plan); }
+  if (droppedPicks.length) savePlan();
   function pickOf(id) { for (var i = 0; i < plan.picks.length; i++) if (plan.picks[i].id === id) return plan.picks[i]; return null; }
   function addPick(id) {
     var a = BY_ID[id], p = pickOf(id);
@@ -583,10 +592,12 @@
     var prev = selectedId;
     selectedId = id && BY_ID[id] ? id : null;
     renderList();
-    $('#detail').innerHTML = detailHTML(selectedId ? BY_ID[selectedId] : null);
+    $('#detail').innerHTML = !selectedId && id && LEGACY_GONE[id]
+      ? '<div class="notice"><strong>此能力已移除</strong><p>【通用】' + esc(LEGACY_GONE[id]) + ' 在 Ver.4.0_D 已移除，不能再用 DP 購買；同名的精通能力仍然保留。<a href="#specialists">看精通能力</a></p></div>'
+      : detailHTML(selectedId ? BY_ID[selectedId] : null);
     $('#detail').setAttribute('data-b', selectedId ? BY_ID[selectedId].b : '');
     $('#detail').scrollTop = 0;
-    $('#catalog').classList.toggle('has-sel', !!selectedId);
+    $('#catalog').classList.toggle('has-sel', !!selectedId || !!(id && LEGACY_GONE[id]));
     if (selectedId) {
       document.title = BY_ID[selectedId].n + '｜深淵的探索者 維基';
       var row = $('.arow[data-id="' + selectedId + '"]');
@@ -900,6 +911,7 @@
     if (s.left < 0) g.push(['bad', 'DP 超支 ' + fmtDP(-s.left) + '。']);
     if (s.count > ABILITY_CAP) g.push(['bad', '創角時最多購買 ' + ABILITY_CAP + ' 個能力，目前 ' + s.count + ' 個。']);
     if (s.unknown) g.push(['warn', '含 ' + s.unknown + ' 個價格待補的能力，DP 未計入。']);
+    if (droppedPicks.length) g.push(['warn', '規則書更新到 D 版：已從規劃中移除不再能購買的 ' + droppedPicks.join('、') + '（現在只剩同名的精通能力）。']);
     if (s.via > s.viaLimit) g.push(['bad', '以「額外能力」取得的能力超過 ' + s.viaLimit + ' 個。']);
     var f = plan.faction && FBY[plan.faction];
     if (f) g.push(['ok', '已加入「' + f.name + '」：獲得特性［' + f.trait.name + '］' + (f.join.fee ? '，創角時免入會費 ' + fmtDP(f.join.fee) + ' DP' : '') + '。']);
@@ -994,6 +1006,8 @@
   var lastPage = null;
   function route() {
     var h = decodeURIComponent(location.hash.slice(1)) || 'home';
+    var legacy = /^a-(m\d{3})$/.exec(h);
+    if (legacy && LEGACY[legacy[1]]) { location.replace('#a-' + LEGACY[legacy[1]]); return; }
     var page = h, nav = h;
     if (h.indexOf('a-') === 0) { page = 'abilities'; nav = 'abilities'; }
     else if (h.indexOf('f-') === 0 && FBY[h.slice(2)]) { page = 'faction'; }
